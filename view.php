@@ -1,0 +1,251 @@
+<?php
+require_once 'includes/db.php';
+require_once 'includes/auth.php';
+
+$pdo = get_pdo();
+$id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+$user_id = is_logged_in() ? $_SESSION['user_id'] : 0;
+$doc = null;
+
+if ($id > 0 && $pdo) {
+    // Handle Like Toggle
+    if (isset($_POST['action']) && $_POST['action'] === 'like' && $user_id > 0) {
+        $check = $pdo->prepare("SELECT id FROM document_likes WHERE document_id = ? AND user_id = ?");
+        $check->execute([$id, $user_id]);
+        if ($check->fetch()) {
+            $pdo->prepare("DELETE FROM document_likes WHERE document_id = ? AND user_id = ?")->execute([$id, $user_id]);
+        } else {
+            $pdo->prepare("INSERT INTO document_likes (document_id, user_id) VALUES (?, ?)")->execute([$id, $user_id]);
+            $pdo->prepare("UPDATE users SET points = points + 5 WHERE id = (SELECT user_id FROM documents WHERE id = ?)")->execute([$id]);
+        }
+    }
+
+    // Handle Comment
+    if (isset($_POST['comment']) && !empty(trim($_POST['comment'])) && $user_id > 0) {
+        $stmt = $pdo->prepare("INSERT INTO comments (document_id, user_id, comment) VALUES (?, ?, ?)");
+        $stmt->execute([$id, $user_id, trim($_POST['comment'])]);
+    }
+
+    // Increase view count
+    $pdo->prepare("UPDATE documents SET views = views + 1 WHERE id = ?")->execute([$id]);
+
+    // Fetch Document
+    $stmt = $pdo->prepare("SELECT d.*, c.name as category_name, u.full_name as author_name, u.username as author_username, u.points as author_points, u.specialty as author_specialty
+                           FROM documents d 
+                           LEFT JOIN categories c ON d.category_id = c.id 
+                           LEFT JOIN users u ON d.user_id = u.id 
+                           WHERE d.id = ?");
+    $stmt->execute([$id]);
+    $doc = $stmt->fetch();
+
+    $like_count = $pdo->prepare("SELECT COUNT(*) FROM document_likes WHERE document_id = ?");
+    $like_count->execute([$id]);
+    $total_likes = $like_count->fetchColumn();
+
+    $user_liked = false;
+    if ($user_id > 0) {
+        $liked_stmt = $pdo->prepare("SELECT id FROM document_likes WHERE document_id = ? AND user_id = ?");
+        $liked_stmt->execute([$id, $user_id]);
+        $user_liked = (bool) $liked_stmt->fetch();
+    }
+
+    $comments_stmt = $pdo->prepare("SELECT c.*, u.full_name, u.username FROM comments c JOIN users u ON c.user_id = u.id WHERE c.document_id = ? ORDER BY c.created_at DESC");
+    $comments_stmt->execute([$id]);
+    $comments = $comments_stmt->fetchAll();
+}
+
+if (!$doc) {
+    header("Location: browse.php");
+    exit;
+}
+
+$type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q&A'];
+?>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?php echo htmlspecialchars($doc['title']); ?> | KM Portal</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .article-content {
+            line-height: 1.9;
+            font-size: 1.0625rem;
+            white-space: pre-wrap;
+            color: hsl(var(--foreground));
+        }
+
+        .comment-card {
+            background: white;
+            border-radius: 1rem;
+            border: 1px solid var(--border-color);
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .author-card {
+            background: white;
+            border-radius: 1.5rem;
+            border: 1px solid var(--border-color);
+            padding: 2rem;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <?php include 'includes/sidebar.php'; ?>
+
+        <main class="main-viewport">
+            <header class="header-top">
+                <div class="page-title">
+                    <h2>รายละเอียดความรู้</h2>
+                    <p><?php echo $type_labels[$doc['type']]; ?> •
+                        <?php echo htmlspecialchars($doc['category_name']); ?></p>
+                </div>
+                <div class="header-actions">
+                    <a href="browse.php" class="btn-primary"
+                        style="background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));"><i
+                            data-lucide="arrow-left"></i>กลับ</a>
+                    <a href="create.php" class="btn-primary"><i data-lucide="plus"></i>สร้างใหม่</a>
+                </div>
+            </header>
+
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem;">
+                <!-- Main Article -->
+                <div>
+                    <article
+                        style="background: white; border-radius: 1.5rem; border: 1px solid var(--border-color); padding: 3rem; margin-bottom: 2rem;">
+                        <span class="tag-badge"
+                            style="background: hsl(var(--primary)/0.1); color: var(--teal-primary); margin-bottom: 1.5rem; display: inline-block;"><?php echo $type_labels[$doc['type']]; ?></span>
+
+                        <h1 style="font-size: 2rem; font-weight: 800; line-height: 1.3; margin-bottom: 1.5rem;">
+                            <?php echo htmlspecialchars($doc['title']); ?></h1>
+
+                        <div
+                            style="display: flex; gap: 1.5rem; color: hsl(var(--muted-foreground)); font-size: 0.875rem; padding-bottom: 2rem; margin-bottom: 2rem; border-bottom: 1px solid var(--border-color);">
+                            <span><i data-lucide="user"
+                                    style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i><?php echo htmlspecialchars($doc['author_name']); ?></span>
+                            <span><i data-lucide="calendar"
+                                    style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i><?php echo date('d M Y', strtotime($doc['created_at'])); ?></span>
+                            <span><i data-lucide="eye"
+                                    style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i><?php echo $doc['views']; ?></span>
+                            <span><i data-lucide="heart"
+                                    style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i><?php echo $total_likes; ?></span>
+                        </div>
+
+                        <div class="article-content"><?php echo nl2br(htmlspecialchars($doc['content'])); ?></div>
+
+                        <div
+                            style="display: flex; gap: 0.75rem; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border-color);">
+                            <form method="POST" style="display:inline;">
+                                <input type="hidden" name="action" value="like">
+                                <button type="submit" class="btn-primary"
+                                    style="<?php echo $user_liked ? 'background: hsl(339 90% 50%); color: white;' : 'background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));'; ?>">
+                                    <i data-lucide="heart"></i><?php echo $user_liked ? 'คุณชอบแล้ว' : 'ถูกใจ'; ?>
+                                    (<?php echo $total_likes; ?>)
+                                </button>
+                            </form>
+                            <button class="btn-primary"
+                                style="background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));"
+                                onclick="document.getElementById('comment-box').focus()"><i
+                                    data-lucide="message-square"></i>แสดงความเห็น</button>
+                            <button class="btn-primary"
+                                style="background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));"><i
+                                    data-lucide="share-2"></i>แชร์</button>
+                        </div>
+                    </article>
+
+                    <!-- Comments Section -->
+                    <section
+                        style="background: white; border-radius: 1.5rem; border: 1px solid var(--border-color); padding: 2rem;">
+                        <h3 style="font-size: 1.125rem; font-weight: 800; margin-bottom: 2rem;"><i
+                                data-lucide="message-circle"
+                                style="width: 20px; height: 20px; vertical-align: middle; margin-right: 8px; color: var(--teal-primary);"></i>ความคิดเห็น
+                            (<?php echo count($comments); ?>)</h3>
+
+                        <?php if (is_logged_in()): ?>
+                            <form method="POST" style="margin-bottom: 2rem;">
+                                <textarea id="comment-box" name="comment" placeholder="แบ่งปันมุมมองของคุณ..."
+                                    style="width: 100%; padding: 1rem; border: 1px solid var(--border-color); border-radius: 0.75rem; min-height: 100px; font-family: inherit; resize: vertical; outline: none; transition: var(--transition-base);"
+                                    onfocus="this.style.borderColor='var(--teal-primary)';this.style.boxShadow='0 0 0 3px hsl(var(--primary)/0.1)'"
+                                    onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'"></textarea>
+                                <div style="text-align: right; margin-top: 1rem;"><button type="submit"
+                                        class="btn-primary">ส่งความคิดเห็น</button></div>
+                            </form>
+                        <?php endif; ?>
+
+                        <div style="display: flex; flex-direction: column; gap: 1rem;">
+                            <?php foreach ($comments as $c): ?>
+                                <div class="comment-card">
+                                    <div
+                                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                            <div
+                                                style="width: 32px; height: 32px; border-radius: 10px; background: var(--teal-primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.75rem;">
+                                                <?php echo strtoupper(substr($c['username'], 0, 1)); ?></div>
+                                            <span
+                                                style="font-weight: 700;"><?php echo htmlspecialchars($c['full_name']); ?></span>
+                                        </div>
+                                        <span
+                                            style="font-size: 0.75rem; color: hsl(var(--muted-foreground));"><?php echo date('d/m/Y H:i', strtotime($c['created_at'])); ?></span>
+                                    </div>
+                                    <p style="color: hsl(var(--foreground)); line-height: 1.6;">
+                                        <?php echo nl2br(htmlspecialchars($c['comment'])); ?></p>
+                                </div>
+                            <?php endforeach; ?>
+                            <?php if (empty($comments)): ?>
+                                <p style="text-align: center; color: hsl(var(--muted-foreground)); padding: 2rem;">
+                                    ยังไม่มีความคิดเห็น เป็นคนแรกที่แสดงความคิดเห็นเกี่ยวกับเนื้อหานี้!</p>
+                            <?php endif; ?>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Author Sidebar -->
+                <aside>
+                    <div class="author-card">
+                        <div
+                            style="width: 80px; height: 80px; border-radius: 24px; background: var(--teal-primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 800; margin: 0 auto 1.5rem; box-shadow: 0 0 0 6px hsl(var(--primary)/0.1);">
+                            <?php echo strtoupper(substr($doc['author_username'] ?? 'KM', 0, 2)); ?></div>
+                        <h4 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 0.25rem;">
+                            <?php echo htmlspecialchars($doc['author_name']); ?></h4>
+                        <p style="color: hsl(var(--muted-foreground)); font-size: 0.875rem; margin-bottom: 1.5rem;">
+                            <?php echo htmlspecialchars($doc['author_specialty'] ?? 'ผู้เชี่ยวชาญประจำระบบ'); ?></p>
+
+                        <div
+                            style="display: flex; justify-content: space-around; background: hsl(var(--muted)/0.3); padding: 1rem; border-radius: 1rem;">
+                            <div>
+                                <div style="font-weight: 800; color: var(--teal-primary); font-size: 1.25rem;">
+                                    <?php echo $doc['author_points'] ?? 0; ?></div>
+                                <div
+                                    style="font-size: 0.6875rem; color: hsl(var(--muted-foreground)); text-transform: uppercase; font-weight: 600;">
+                                    XP</div>
+                            </div>
+                            <div style="width: 1px; background: var(--border-color);"></div>
+                            <div>
+                                <div style="font-weight: 800; color: hsl(var(--foreground)); font-size: 1.25rem;">Expert
+                                </div>
+                                <div
+                                    style="font-size: 0.6875rem; color: hsl(var(--muted-foreground)); text-transform: uppercase; font-weight: 600;">
+                                    ระดับ</div>
+                            </div>
+                        </div>
+                        <a href="experts.php" class="btn-primary"
+                            style="width: 100%; justify-content: center; margin-top: 1.5rem; background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));">ดูโปรไฟล์ทั้งหมด</a>
+                    </div>
+                </aside>
+            </div>
+        </main>
+    </div>
+    <script>lucide.createIcons();</script>
+</body>
+
+</html>

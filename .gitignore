@@ -1,0 +1,18 @@
+# Database credentials
+includes/db.php
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE Files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Temporary Files
+tmp/
+*.log
+*.tmp
