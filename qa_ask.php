@@ -122,19 +122,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
 <body>
     <div class="app-container">
         <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="sidebar-brand">
-                <div class="brand-icon"><i data-lucide="book-open"></i></div>
-                <div class="brand-info">
-                    <h1>KM Portal</h1><span>UDRU HUB</span>
-                </div>
-            </div>
-            <nav class="nav-group">
-                <div class="nav-label">เมนูหลัก</div>
-                <a href="index.php" class="nav-link"><i data-lucide="layout"></i>หน้าหลัก</a>
-                <a href="browse.php" class="nav-link"><i data-lucide="search"></i>คลังความรู้</a>
-            </nav>
-        </aside>
+        <!-- Sidebar -->
+        <?php include 'includes/sidebar.php'; ?>
 
         <!-- Main Viewport -->
         <main class="main-viewport">

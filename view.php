@@ -26,6 +26,13 @@ if ($id > 0 && $pdo) {
         $stmt->execute([$id, $user_id, trim($_POST['comment'])]);
     }
 
+    // Handle Delete Document (Admin Only)
+    if (isset($_POST['action']) && $_POST['action'] === 'delete_doc' && isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
+        $pdo->prepare("DELETE FROM documents WHERE id = ?")->execute([$id]);
+        header("Location: browse.php?msg=deleted");
+        exit;
+    }
+
     // Increase view count
     $pdo->prepare("UPDATE documents SET views = views + 1 WHERE id = ?")->execute([$id]);
 
@@ -108,7 +115,8 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                 <div class="page-title">
                     <h2>รายละเอียดความรู้</h2>
                     <p><?php echo $type_labels[$doc['type']]; ?> •
-                        <?php echo htmlspecialchars($doc['category_name']); ?></p>
+                        <?php echo htmlspecialchars($doc['category_name']); ?>
+                    </p>
                 </div>
                 <div class="header-actions">
                     <a href="browse.php" class="btn-primary"
@@ -127,7 +135,8 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                             style="background: hsl(var(--primary)/0.1); color: var(--teal-primary); margin-bottom: 1.5rem; display: inline-block;"><?php echo $type_labels[$doc['type']]; ?></span>
 
                         <h1 style="font-size: 2rem; font-weight: 800; line-height: 1.3; margin-bottom: 1.5rem;">
-                            <?php echo htmlspecialchars($doc['title']); ?></h1>
+                            <?php echo htmlspecialchars($doc['title']); ?>
+                        </h1>
 
                         <div
                             style="display: flex; gap: 1.5rem; color: hsl(var(--muted-foreground)); font-size: 0.875rem; padding-bottom: 2rem; margin-bottom: 2rem; border-bottom: 1px solid var(--border-color);">
@@ -160,6 +169,18 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                             <button class="btn-primary"
                                 style="background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));"><i
                                     data-lucide="share-2"></i>แชร์</button>
+
+                            <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
+                                <form method="POST"
+                                    onsubmit="return confirm('คุณต้องการลบบทความนี้ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้');"
+                                    style="display:inline;">
+                                    <input type="hidden" name="action" value="delete_doc">
+                                    <button type="submit" class="btn-primary"
+                                        style="background: hsl(0 84% 60% / 0.1); color: hsl(0 84% 60%); border: 1px solid hsl(0 84% 60% / 0.2);">
+                                        <i data-lucide="trash-2"></i>ลบบทความ
+                                    </button>
+                                </form>
+                            <?php endif; ?>
                         </div>
                     </article>
 
@@ -190,7 +211,8 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                                         <div style="display: flex; align-items: center; gap: 0.75rem;">
                                             <div
                                                 style="width: 32px; height: 32px; border-radius: 10px; background: var(--teal-primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.75rem;">
-                                                <?php echo strtoupper(substr($c['username'], 0, 1)); ?></div>
+                                                <?php echo strtoupper(substr($c['username'], 0, 1)); ?>
+                                            </div>
                                             <span
                                                 style="font-weight: 700;"><?php echo htmlspecialchars($c['full_name']); ?></span>
                                         </div>
@@ -198,7 +220,8 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                                             style="font-size: 0.75rem; color: hsl(var(--muted-foreground));"><?php echo date('d/m/Y H:i', strtotime($c['created_at'])); ?></span>
                                     </div>
                                     <p style="color: hsl(var(--foreground)); line-height: 1.6;">
-                                        <?php echo nl2br(htmlspecialchars($c['comment'])); ?></p>
+                                        <?php echo nl2br(htmlspecialchars($c['comment'])); ?>
+                                    </p>
                                 </div>
                             <?php endforeach; ?>
                             <?php if (empty($comments)): ?>
@@ -214,17 +237,21 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                     <div class="author-card">
                         <div
                             style="width: 80px; height: 80px; border-radius: 24px; background: var(--teal-primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 800; margin: 0 auto 1.5rem; box-shadow: 0 0 0 6px hsl(var(--primary)/0.1);">
-                            <?php echo strtoupper(substr($doc['author_username'] ?? 'KM', 0, 2)); ?></div>
+                            <?php echo strtoupper(substr($doc['author_username'] ?? 'KM', 0, 2)); ?>
+                        </div>
                         <h4 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 0.25rem;">
-                            <?php echo htmlspecialchars($doc['author_name']); ?></h4>
+                            <?php echo htmlspecialchars($doc['author_name']); ?>
+                        </h4>
                         <p style="color: hsl(var(--muted-foreground)); font-size: 0.875rem; margin-bottom: 1.5rem;">
-                            <?php echo htmlspecialchars($doc['author_specialty'] ?? 'ผู้เชี่ยวชาญประจำระบบ'); ?></p>
+                            <?php echo htmlspecialchars($doc['author_specialty'] ?? 'ผู้เชี่ยวชาญประจำระบบ'); ?>
+                        </p>
 
                         <div
                             style="display: flex; justify-content: space-around; background: hsl(var(--muted)/0.3); padding: 1rem; border-radius: 1rem;">
                             <div>
                                 <div style="font-weight: 800; color: var(--teal-primary); font-size: 1.25rem;">
-                                    <?php echo $doc['author_points'] ?? 0; ?></div>
+                                    <?php echo $doc['author_points'] ?? 0; ?>
+                                </div>
                                 <div
                                     style="font-size: 0.6875rem; color: hsl(var(--muted-foreground)); text-transform: uppercase; font-weight: 600;">
                                     XP</div>

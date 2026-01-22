@@ -170,26 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
 <body>
     <div class="app-container">
         <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="sidebar-brand">
-                <div class="brand-icon"><i data-lucide="book-open"></i></div>
-                <div class="brand-info">
-                    <h1>KM Portal</h1><span>UDRU HUB</span>
-                </div>
-            </div>
-            <nav class="nav-group">
-                <div class="nav-label">เมนูหลัก</div>
-                <a href="index.php" class="nav-link"><i data-lucide="layout"></i>หน้าหลัก</a>
-                <a href="browse.php" class="nav-link"><i data-lucide="search"></i>คลังความรู้</a>
-            </nav>
-            <nav class="nav-group">
-                <div class="nav-label">ขุมปัญญา UDRU</div>
-                <a href="experts.php" class="nav-link"><i data-lucide="users"></i>รายชื่อผู้เชี่ยวชาญ</a>
-                <a href="cop.php" class="nav-link"><i data-lucide="share-2"></i>เครือข่าย CoP</a>
-                <a href="categories.php" class="nav-link"><i data-lucide="folder-tree"></i>หมวดหมู่ความรู้</a>
-                <a href="training.php" class="nav-link"><i data-lucide="graduation-cap"></i>คอร์สความรู้</a>
-            </nav>
-        </aside>
+        <?php include 'includes/sidebar.php'; ?>
 
         <!-- Main Viewport -->
         <main class="main-viewport">

@@ -43,9 +43,9 @@ if ($pdo) {
                     <p>พื้นที่แลกเปลี่ยนเรียนรู้และสร้างความร่วมมือเชิงลึกในแต่ละสาขา</p>
                 </div>
                 <div class="header-actions">
-                    <button class="btn-primary" style="background:#8b5cf6;"><i
-                            data-lucide="plus"></i>สร้างชุมชน</button>
-                    <!-- Purple hue for CoP Creation per manual observation -->
+                    <a href="cop_create.php" class="btn-primary" style="background:#8b5cf6; text-decoration: none;">
+                        <i data-lucide="plus"></i>สร้างชุมชน
+                    </a>
                 </div>
             </header>
 
@@ -92,8 +92,8 @@ if ($pdo) {
                     <div class="card-knowledge">
                         <div style="display: flex; gap: 1rem; align-items: flex-start; margin-bottom: 1.25rem;">
                             <div
-                                style="width: 48px; height: 48px; border-radius: 12px; background: hsl(var(--muted)); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
-                                <?php echo $cop['icon'] ?? '🤝'; ?>
+                                style="width: 48px; height: 48px; border-radius: 12px; background: hsl(var(--muted)); display: flex; align-items: center; justify-content: center; color: var(--teal-primary);">
+                                <i data-lucide="<?php echo htmlspecialchars($cop['icon'] ?? 'users'); ?>"></i>
                             </div>
                             <div style="flex: 1;">
                                 <h3 style="margin-bottom: 0.25rem;"><?php echo htmlspecialchars($cop['name']); ?></h3>
@@ -105,7 +105,8 @@ if ($pdo) {
                         <p class="card-excerpt"><?php echo htmlspecialchars($cop['description']); ?></p>
 
                         <div class="card-footer" style="border: none; padding-top: 0;">
-                            <button class="btn-primary" style="width: 100%; justify-content: center;">เข้าร่วมกลุ่ม</button>
+                            <button class="btn-primary" style="width: 100%; justify-content: center;"
+                                onclick="joinGroup('<?php echo htmlspecialchars($cop['name']); ?>')">เข้าร่วมกลุ่ม</button>
                         </div>
                     </div>
                 <?php endforeach; ?>
@@ -113,8 +114,21 @@ if ($pdo) {
         </main>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         lucide.createIcons();
+
+        function joinGroup(groupName) {
+            Swal.fire({
+                title: 'ยินดีต้อนรับ!',
+                text: 'คุณได้เข้าร่วมกลุ่ม ' + groupName + ' เรียบร้อยแล้ว',
+                icon: 'success',
+                confirmButtonText: 'ตกลง',
+                confirmButtonColor: 'var(--teal-primary)',
+                background: 'white',
+                color: 'hsl(var(--foreground))'
+            });
+        }
     </script>
 </body>
 

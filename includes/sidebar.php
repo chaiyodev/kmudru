@@ -67,18 +67,40 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <i data-lucide="settings"></i>
             <span>ตั้งค่าระบบ</span>
         </a>
+        <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
+            <a href="admin_dashboard.php"
+                class="nav-link <?php echo ($current_page == 'admin_dashboard.php' || $current_page == 'admin_users.php') ? 'active' : ''; ?>">
+                <i data-lucide="shield"></i>
+                <span>ผู้ดูแลระบบ</span>
+            </a>
+        <?php endif; ?>
     </nav>
 
     <div style="margin-top: auto; display: flex; flex-direction: column; gap: 0.5rem;">
         <?php if (is_logged_in()): ?>
-            <a href="profile.php" class="nav-link <?php echo $current_page == 'profile.php' ? 'active' : ''; ?>">
-                <i data-lucide="user"></i>
-                <span>โปรไฟล์ของฉัน</span>
-            </a>
-            <a href="logout.php" class="nav-link">
-                <i data-lucide="log-out"></i>
-                <span>ออกจากระบบ</span>
-            </a>
+            <div style="padding: 0.75rem; background: hsl(var(--muted)/0.3); border-radius: 12px; margin-bottom: 0.5rem;">
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                    <div
+                        style="width: 32px; height: 32px; background: var(--teal-primary); border-radius: 8px; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.875rem;">
+                        <?php echo strtoupper(substr($_SESSION['username'] ?? 'U', 0, 1)); ?>
+                    </div>
+                    <div style="flex: 1; overflow: hidden;">
+                        <div
+                            style="font-size: 0.875rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            <?php echo htmlspecialchars($_SESSION['full_name'] ?? $_SESSION['username']); ?>
+                        </div>
+                        <div style="font-size: 0.75rem; color: hsl(var(--muted-foreground)); text-transform: capitalize;">
+                            <?php echo htmlspecialchars($_SESSION['role']); ?>
+                        </div>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                    <a href="profile.php" class="btn-sm"
+                        style="text-align: center; background: white; border: 1px solid var(--border-color); border-radius: 6px; padding: 0.25rem; font-size: 0.75rem; color: hsl(var(--foreground)); text-decoration: none;">โปรไฟล์</a>
+                    <a href="logout.php" class="btn-sm"
+                        style="text-align: center; background: white; border: 1px solid var(--border-color); border-radius: 6px; padding: 0.25rem; font-size: 0.75rem; color: hsl(var(--foreground)); text-decoration: none;">ออก</a>
+                </div>
+            </div>
         <?php else: ?>
             <a href="login.php" class="nav-link">
                 <i data-lucide="log-in"></i>
