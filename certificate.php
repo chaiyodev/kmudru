@@ -29,9 +29,8 @@ if (!$cert) {
     die("Certificate not found.");
 }
 
-// Default to "Academic Director" if no instructor found
 $signer_name = $cert['instructor_name'] ?? 'Academic Director';
-$signer_title = $cert['instructor_dept'] ? 'Instructor of ' . $cert['instructor_dept'] : 'Course Instructor';
+$signer_title = $cert['instructor_dept'] ? 'Expert in ' . $cert['instructor_dept'] : 'Course Instructor';
 
 ?>
 <!DOCTYPE html>
@@ -40,11 +39,18 @@ $signer_title = $cert['instructor_dept'] ? 'Instructor of ' . $cert['instructor_
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Certificate of Achievement</title>
+    <title>UDRU - Digital Certificate</title>
     <link
-        href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Great+Vibes&family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Sarabun:wght@300;400;500;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cinzel:wght@700&family=Sarabun:wght@400;500;700&family=Cormorant+Garamond:ital,wght@0,700;1,700&display=swap"
         rel="stylesheet">
     <style>
+        :root {
+            --cert-navy: #0f172a;
+            --cert-gold: #c29c53;
+            --cert-gold-light: #eaddca;
+            --cert-border: rgba(194, 156, 83, 0.3);
+        }
+
         @page {
             size: landscape;
             margin: 0;
@@ -53,262 +59,296 @@ $signer_title = $cert['instructor_dept'] ? 'Instructor of ' . $cert['instructor_
         body {
             margin: 0;
             padding: 0;
-            font-family: 'Cormorant Garamond', serif;
-            background: #222;
+            font-family: 'Inter', sans-serif;
+            background: #1a1a1a;
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
         }
 
-        .certificate-container {
+        .certificate-wrapper {
+            position: relative;
             width: 1123px;
             height: 794px;
-            /* A4 Landscape */
-            background: #fffdf5;
-            /* Cream/Ivory */
-            position: relative;
-            color: #1e293b;
-            text-align: center;
-            box-sizing: border-box;
-            padding: 40px;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            background: white;
+            box-shadow: 0 40px 100px rgba(0, 0, 0, 0.6);
+            overflow: hidden;
+            display: flex;
+            color: var(--cert-navy);
         }
 
-        /* Border Design */
-        .border-outer {
+        /* Abstract Pattern Background */
+        .bg-pattern {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
-            border: 4px solid #b45309;
-            /* Bronze/Gold */
-            position: relative;
-            box-sizing: border-box;
-            background: #fff;
+            pointer-events: none;
+            opacity: 0.05;
+            background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%230f172a' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3Csvg%3E");
         }
 
-        .border-inner {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            right: 10px;
-            bottom: 10px;
-            border: 2px solid #0f172a;
-            /* Navy */
-            box-sizing: border-box;
+        /* Side Geometric Element */
+        .side-accent {
+            width: 80px;
+            height: 100%;
+            background: var(--cert-navy);
+            position: relative;
             display: flex;
             flex-direction: column;
             justify-content: center;
-            background-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9IiNlN2U1ZTQiLz48L3N2Zz4=');
-            /* Subtle dots */
+            align-items: center;
+            gap: 200px;
         }
 
-        .corner-deco {
+        .side-accent::after {
+            content: '';
             position: absolute;
-            width: 60px;
-            height: 60px;
-            border-style: double;
-            border-color: #b45309;
+            left: 80px;
+            top: 0;
+            width: 4px;
+            height: 100%;
+            background: linear-gradient(to bottom, transparent, var(--cert-gold), transparent);
         }
 
-        .top-left {
-            top: 15px;
-            left: 15px;
-            border-width: 4px 0 0 4px;
-        }
-
-        .top-right {
-            top: 15px;
-            right: 15px;
-            border-width: 4px 4px 0 0;
-        }
-
-        .bottom-left {
-            bottom: 15px;
-            left: 15px;
-            border-width: 0 0 4px 4px;
-        }
-
-        .bottom-right {
-            bottom: 15px;
-            right: 15px;
-            border-width: 0 4px 4px 0;
-        }
-
-        /* Content */
-        .logo {
-            font-family: 'Cinzel', serif;
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: #b45309;
-            letter-spacing: 4px;
-            margin-bottom: 2rem;
+        .vertical-text {
+            transform: rotate(-90deg);
+            color: var(--cert-gold);
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 5px;
             text-transform: uppercase;
-        }
-
-        h1 {
-            font-family: 'Cinzel', serif;
-            font-size: 3.5rem;
-            color: #0f172a;
-            margin: 0;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            line-height: 1;
-        }
-
-        .subtitle {
-            font-size: 1.25rem;
-            text-transform: uppercase;
-            letter-spacing: 3px;
-            color: #64748b;
-            margin-top: 1rem;
-            margin-bottom: 3rem;
-        }
-
-        .content-body {
-            margin: 1.5rem 0;
-        }
-
-        .presented-text {
-            font-style: italic;
-            font-size: 1.25rem;
-            color: #475569;
-            margin-bottom: 0.5rem;
-        }
-
-        .student-name {
-            font-family: 'Great Vibes', cursive;
-            font-size: 3.5rem;
-            /* Reduced from 5rem */
-            color: #b45309;
-            line-height: 1.2;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
-            margin-bottom: 0.5rem;
-        }
-
-        .course-text {
-            font-size: 1.2rem;
-            color: #334155;
-            max-width: 800px;
-            margin: 0 auto;
-            line-height: 1.6;
-        }
-
-        .course-title {
-            font-weight: 700;
-            color: #0f172a;
-            font-size: 2rem;
-            /* Adjusted for balance */
-            display: block;
-            margin-top: 0.5rem;
-            border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 0.5rem;
-            display: inline-block;
-        }
-
-        .footer {
-            display: flex;
-            justify-content: center;
-            gap: 150px;
-            margin-top: 3rem;
-            align-items: flex-end;
-            position: relative;
-            z-index: 2;
-        }
-
-        .signature-block {
-            text-align: center;
-        }
-
-        .sign {
-            font-family: 'Great Vibes', cursive;
-            font-size: 2rem;
-            /* Reduced from 2.5rem */
-            font-weight: 400;
-            /* Lighter weight */
-            color: #0f172a;
-            margin-bottom: 0.25rem;
-        }
-
-        .line {
-            width: 250px;
-            height: 1px;
-            background: #94a3b8;
-            margin: 0 auto 0.5rem auto;
-        }
-
-        .title {
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #64748b;
-            font-weight: 500;
             white-space: nowrap;
         }
 
-        /* Seal */
-        .seal {
-            position: absolute;
-            bottom: 60px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 120px;
-            height: 120px;
-            border: 4px double #b45309;
+        /* Main Content */
+        .cert-main {
+            flex: 1;
+            padding: 60px 80px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 50px;
+        }
+
+        .udru-logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo-box {
+            width: 50px;
+            height: 50px;
+            background: var(--cert-navy);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 900;
+            font-size: 1.2rem;
+        }
+
+        .logo-text {
+            font-family: 'Cinzel', serif;
+            font-size: 1.1rem;
+            letter-spacing: 2px;
+            color: var(--cert-navy);
+        }
+
+        .cert-title-area {
+            text-align: right;
+        }
+
+        .cert-id-tag {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .main-heading {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 4.5rem;
+            margin: 30px 0 10px;
+            font-weight: 700;
+            line-height: 1;
+            color: var(--cert-navy);
+        }
+
+        .sub-heading {
+            font-size: 1.25rem;
+            font-weight: 500;
+            color: #64748b;
+            margin-bottom: 60px;
+            letter-spacing: 1px;
+        }
+
+        .student-name {
+            font-size: 4.5rem;
+            font-weight: 800;
+            color: var(--cert-gold);
+            margin: 20px 0;
+            font-family: 'Sarabun', sans-serif;
+            position: relative;
+            display: inline-block;
+        }
+
+        .course-info {
+            font-size: 1.15rem;
+            color: #475569;
+            margin-top: 40px;
+            line-height: 1.8;
+            max-width: 700px;
+        }
+
+        .course-name {
+            font-weight: 700;
+            color: var(--cert-navy);
+            font-size: 1.5rem;
+            border-bottom: 2px solid var(--cert-gold);
+            padding-bottom: 4px;
+        }
+
+        .footer {
+            margin-top: auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .signature-group {
+            display: flex;
+            gap: 80px;
+        }
+
+        .sig-block {
+            text-align: center;
+        }
+
+        .sig-name {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .sig-title {
+            font-size: 0.75rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .sig-line {
+            width: 200px;
+            height: 1px;
+            background: #e2e8f0;
+            margin: 15px 0 10px;
+        }
+
+        /* Gold Seal */
+        .seal-modern {
+            width: 130px;
+            height: 130px;
+            background: linear-gradient(135deg, #d4af37 0%, #f1d382 50%, #d4af37 100%);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #b45309;
-            font-weight: 700;
-            font-family: 'Cinzel', serif;
-            font-size: 0.8rem;
-            text-align: center;
-            opacity: 0.2;
-            pointer-events: none;
+            box-shadow: 0 10px 20px rgba(212, 175, 55, 0.3);
+            position: relative;
         }
 
-        .cert-id {
+        .seal-inner {
+            width: 110px;
+            height: 110px;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-align: center;
+        }
+
+        .seal-text {
+            font-size: 0.6rem;
+            font-weight: 900;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .seal-year {
+            font-size: 1rem;
+            font-weight: 800;
+            margin-top: 2px;
+        }
+
+        /* Verification QR */
+        .verification {
             position: absolute;
-            bottom: 20px;
-            right: 20px;
-            font-size: 0.8rem;
-            font-family: sans-serif;
-            color: #cbd5e1;
+            bottom: 60px;
+            right: 80px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .qr-placeholder {
+            width: 80px;
+            height: 80px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 5px;
+            border-radius: 8px;
+        }
+
+        .qr-code {
+            width: 100%;
+            height: 100%;
+            background: #0f172a;
+            mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='7' height='7'%3E%3C/rect%3E%3Crect x='14' y='3' width='7' height='7'%3E%3C/rect%3E%3Crect x='14' y='14' width='7' height='7'%3E%3C/rect%3E%3Crect x='3' y='14' width='7' height='7'%3E%3C/rect%3E%3C/svg%3E");
+            mask-repeat: no-repeat;
+            mask-position: center;
         }
 
         .print-btn {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
-            padding: 1rem 2rem;
-            background: #0f172a;
+            bottom: 30px;
+            right: 30px;
+            background: var(--cert-navy);
             color: white;
-            border: none;
+            padding: 15px 30px;
             border-radius: 50px;
+            font-weight: 700;
+            border: none;
             cursor: pointer;
-            font-size: 1rem;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-            transition: 0.3s;
-            font-family: 'Sarabun', sans-serif;
-        }
-
-        .print-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            z-index: 100;
         }
 
         @media print {
+            .print-btn {
+                display: none;
+            }
+
             body {
                 background: white;
             }
 
-            .certificate-container {
+            .certificate-wrapper {
                 box-shadow: none;
-                margin: 0;
-            }
-
-            .print-btn {
-                display: none;
             }
         }
     </style>
@@ -316,47 +356,72 @@ $signer_title = $cert['instructor_dept'] ? 'Instructor of ' . $cert['instructor_
 
 <body>
 
-    <div class="certificate-container">
-        <div class="border-outer">
-            <div class="border-inner">
-                <!-- Decorations -->
-                <div class="corner-deco top-left"></div>
-                <div class="corner-deco top-right"></div>
-                <div class="corner-deco bottom-left"></div>
-                <div class="corner-deco bottom-right"></div>
+    <div class="certificate-wrapper">
+        <div class="bg-pattern"></div>
 
-                <div class="logo">KM UDRU Training Center</div>
+        <div class="side-accent">
+            <div class="vertical-text">ESTABLISHED 1923</div>
+            <div class="vertical-text">KM UDRU ACADEMY</div>
+            <div class="vertical-text">VERIFIED RECORD</div>
+        </div>
 
-                <h1>Certificate of Completion</h1>
-                <div class="subtitle">มอบประกาศนียบัตรฉบับนี้ไว้เพื่อแสดงว่า</div>
+        <div class="cert-main">
+            <div class="header">
+                <div class="udru-logo">
+                    <div class="logo-box">KM</div>
+                    <div class="logo-text">UDRU TRAINING CENTER</div>
+                </div>
+                <div class="cert-title-area">
+                    <div class="cert-id-tag">CERTIFICATE ID: <?php echo htmlspecialchars($cert['certificate_code']); ?>
+                    </div>
+                    <div style="font-weight: 800; font-size: 0.8rem; letter-spacing: 2px;">OFFICIAL DOCUMENT</div>
+                </div>
+            </div>
 
-                <div class="content-body">
-                    <div class="student-name"><?php echo htmlspecialchars($cert['student_name']); ?></div>
+            <div class="main-heading">Certificate of Achievement</div>
+            <div class="sub-heading">มอบคุณสมบัติและประกาศนียบัตรฉบับนี้แก่</div>
 
-                    <div class="course-text">
-                        ได้ผ่านการฝึกอบรมและทดสอบความรู้ในหลักสูตร
-                        <br>
-                        <span class="course-title">"<?php echo htmlspecialchars($cert['course_title']); ?>"</span>
+            <div class="student-name">
+                <?php echo htmlspecialchars($cert['student_name']); ?>
+                <div
+                    style="position: absolute; bottom: -10px; left: 0; width: 100%; height: 4px; background: var(--cert-gold); opacity: 0.3;">
+                </div>
+            </div>
+
+            <div class="course-info">
+                ได้รับวุฒิบัตรจากการผ่านการฝึกอบรมและทดสอบเกณฑ์มาตรฐานในหลักสูตร
+                <br>
+                <span class="course-name">"<?php echo htmlspecialchars($cert['course_title']); ?>"</span>
+                <br>
+                <div style="margin-top: 15px; font-size: 0.95rem;">
+                    โดยได้คะแนนผ่านเกณฑ์ตามที่มหาวิทยาลัยกำหนด ออกให้ ณ วันที่
+                    <?php echo date('d F Y', strtotime($cert['issued_at'])); ?>
+                </div>
+            </div>
+
+            <div class="footer">
+                <div class="signature-group">
+                    <div class="sig-block">
+                        <div class="sig-name"><?php echo htmlspecialchars($signer_name); ?></div>
+                        <div class="sig-line"></div>
+                        <div class="sig-title"><?php echo htmlspecialchars($signer_title); ?></div>
                     </div>
                 </div>
 
-                <div class="seal">OFFICIAL<br>CERTIFIED</div>
-
-                <div class="footer">
-                    <div class="signature-block">
-                        <div class="sign"><?php echo date('d F Y', strtotime($cert['issued_at'])); ?></div>
-                        <div class="line"></div>
-                        <div class="title">Date of Completion (วันที่สำเร็จ)</div>
-                    </div>
-
-                    <div class="signature-block">
-                        <div class="sign"><?php echo htmlspecialchars($signer_name); ?></div>
-                        <div class="line"></div>
-                        <div class="title"><?php echo htmlspecialchars($signer_title); ?></div>
+                <div class="seal-modern">
+                    <div class="seal-inner">
+                        <div class="seal-text">Official</div>
+                        <div class="seal-year"><?php echo date('Y'); ?></div>
+                        <div class="seal-text">Certified</div>
                     </div>
                 </div>
+            </div>
 
-                <div class="cert-id">Verification Code: <?php echo htmlspecialchars($cert['certificate_code']); ?></div>
+            <div class="verification">
+                <div class="qr-placeholder">
+                    <div class="qr-code"></div>
+                </div>
+                <div style="font-size: 0.6rem; font-weight: 700; color: #94a3b8;">SCAN TO VERIFY</div>
             </div>
         </div>
     </div>

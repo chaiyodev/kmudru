@@ -99,12 +99,15 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                 <p>แหล่งรวบรวมเทคนิค วิจัย และแนวทางการทำงานที่ดีที่สุดของบุคลากร UDRU</p>
 
                 <div class="search-container-center">
-                    <form action="browse.php" method="GET" class="search-inner">
-                        <i data-lucide="search" style="color: hsl(var(--muted-foreground));"></i>
-                        <input type="text" name="search" placeholder="พิมพ์สิ่งที่คุณต้องการค้นหา..." autofocus>
-                        <kbd
-                            style="font-size: 0.75rem; background: hsl(var(--muted)); padding: 4px 8px; border-radius: 6px; font-weight: 700; color: hsl(var(--muted-foreground));">⌘
-                            K</kbd>
+                    <form action="ai_assistant.php" method="GET" class="search-inner" id="main-search-form">
+                        <i data-lucide="search" id="search-icon" style="color: hsl(var(--muted-foreground));"></i>
+                        <input type="text" name="q" id="search-input" placeholder="พิมพ์สิ่งที่คุณต้องการค้นหา..."
+                            autofocus>
+                        <button type="button" onclick="toggleAI()" id="ai-toggle-btn" class="ai-badge"
+                            style="cursor: pointer; border: none; background: #f1f5f9; color: #64748b; font-size: 0.65rem; padding: 4px 8px; border-radius: 6px;">
+                            <i data-lucide="sparkles" style="width: 12px; height: 12px; margin-right: 4px;"></i> AI
+                            Mode: OFF
+                        </button>
                         <button type="submit" class="btn-search-main">สืบค้น</button>
                     </form>
                 </div>
@@ -189,6 +192,16 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                 </section>
 
                 <aside>
+                    <!-- AI Smart Hub Widget -->
+                    <div style="background: linear-gradient(135deg, #14b8a6 0%, #0ea5e9 100%); padding: 1.5rem; border-radius: 1rem; color: white; margin-bottom: 2rem; position: relative; overflow: hidden; box-shadow: 0 10px 25px rgba(20, 184, 166, 0.3);">
+                        <i data-lucide="sparkles" style="position: absolute; right: -10px; top: -10px; width: 60px; height: 60px; opacity: 0.2;"></i>
+                        <h4 style="font-size: 1rem; font-weight: 800; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <i data-lucide="bot" style="width: 18px;"></i> AI Smart Insight
+                        </h4>
+                        <p style="font-size: 0.8rem; opacity: 0.9; line-height: 1.5;">วันนี้มีเอกสาร 5 รายการใหม่ที่ตรงกับทักษะ "ประกันคุณภาพ" ของคุณครับ</p>
+                        <a href="ai_assistant.php" style="display: block; width: 100%; padding: 0.65rem; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 10px; color: white; text-align: center; text-decoration: none; margin-top: 1rem; font-size: 0.8125rem; font-weight: 700;">ดูข้อมูลเจาะลึก</a>
+                    </div>
+
                     <div
                         style="background: white; border-radius: 0.75rem; border: 1px solid var(--border-color); padding: 1.5rem;">
                         <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 1.5rem;">หัวข้อยอดนิยม</h3>
@@ -237,6 +250,32 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
 
     <script>
         lucide.createIcons();
+
+        let aiMode = false;
+        function toggleAI() {
+            aiMode = !aiMode;
+            const btn = document.getElementById('ai-toggle-btn');
+            const icon = document.getElementById('search-icon');
+            const form = document.getElementById('main-search-form');
+            const input = document.getElementById('search-input');
+
+            if (aiMode) {
+                btn.innerHTML = `<i data-lucide="sparkles" style="width: 12px; height: 12px; margin-right: 4px;"></i> AI Mode: ON`;
+                btn.style.background = 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)';
+                btn.style.color = 'white';
+                icon.style.color = '#6366f1';
+                form.action = 'ai_assistant.php';
+                input.placeholder = "ถามคำถามกับ AI อัจฉริยะ...";
+            } else {
+                btn.innerHTML = `<i data-lucide="sparkles" style="width: 12px; height: 12px; margin-right: 4px;"></i> AI Mode: OFF`;
+                btn.style.background = '#f1f5f9';
+                btn.style.color = '#64748b';
+                icon.style.color = 'hsl(var(--muted-foreground))';
+                form.action = 'browse.php';
+                input.placeholder = "พิมพ์สิ่งที่คุณต้องการค้นหา...";
+            }
+            lucide.createIcons();
+        }
     </script>
 </body>
 

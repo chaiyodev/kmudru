@@ -31,6 +31,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <i data-lucide="message-square"></i>
             <span>กล่องข้อความ</span>
         </a>
+        <a href="ai_assistant.php" class="nav-link <?php echo $current_page == 'ai_assistant.php' ? 'active' : ''; ?>"
+            style="background: rgba(20, 184, 166, 0.1); color: var(--teal-primary); border-left: 3px solid var(--teal-primary);">
+            <i data-lucide="bot"></i>
+            <span>AI Assistant</span>
+            <span class="ai-badge" style="margin-left: auto;">NEW</span>
+        </a>
     </nav>
 
     <nav class="nav-group">
@@ -41,7 +47,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <span>รายชื่อผู้เชี่ยวชาญ</span>
         </a>
         <a href="cop.php"
-            class="nav-link <?php echo ($current_page == 'cop.php' || $current_page == 'cop_create.php') ? 'active' : ''; ?>">
+            class="nav-link <?php echo ($current_page == 'cop.php' || $current_page == 'cop_create.php' || $current_page == 'cop_view.php') ? 'active' : ''; ?>">
             <i data-lucide="share-2"></i>
             <span>เครือข่าย CoP</span>
         </a>
@@ -115,6 +121,16 @@ $current_page = basename($_SERVER['PHP_SELF']);
         </button>
     </div>
 </aside>
+
+<!-- Global AI Assistant UI -->
+<div class="ai-float-btn-container">
+    <div class="ai-tooltip">คุณมีคำถามอะไรไหมคะ? ⚡</div>
+    <button class="ai-float-btn" onclick="aiAssistant('chat')">
+        <i data-lucide="bot-message-square" style="width: 28px; height: 28px;"></i>
+    </button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
     function toggleSidebar() {
