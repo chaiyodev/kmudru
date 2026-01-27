@@ -12,6 +12,7 @@ $message = '';
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
+    verify_csrf_token($_POST['csrf_token'] ?? '');
     $title = $_POST['title'];
     $category_id = $_POST['category_id'];
     $content = $_POST['content'];
@@ -182,13 +183,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
             </header>
 
             <?php if ($message): ?>
-                <div
-                    style="background: hsl(142 76% 36% / 0.1); color: hsl(142 76% 36%); padding: 1rem; border-radius: 0.5rem; margin-bottom: 2rem; border: 1px solid hsl(142 76% 36% / 0.2);">
-                    <?php echo $message; ?>
+                <div style="background: hsl(142 76% 36% / 0.1); color: hsl(142 76% 36%); padding: 1rem; border-radius: 0.5rem; margin-bottom: 2rem; border: 1px solid hsl(142 76% 36% / 0.2);">
+                    <?php echo e($message); ?>
                 </div>
             <?php endif; ?>
 
             <form action="wiki_create.php" method="POST">
+                <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                 <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2.5rem;">
                     <div>
                         <div
@@ -238,8 +239,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
                                 <select name="category_id" class="form-select" required>
                                     <option value="">เลือกหมวดหมู่...</option>
                                     <?php foreach ($categories as $cat): ?>
-                                        <option value="<?php echo $cat['id']; ?>">
-                                            <?php echo htmlspecialchars($cat['name']); ?>
+                                        <option value="<?php echo e($cat['id']); ?>">
+                                            <?php echo e($cat['name']); ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>

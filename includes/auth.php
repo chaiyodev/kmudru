@@ -1,9 +1,19 @@
 <?php
 session_start();
+require_once __DIR__ . '/security.php';
 require_once __DIR__ . '/db.php';
 
 function login($username, $password)
 {
+    // Basic Brute Force Protection
+    if (isset($_SESSION['login_attempts']) && $_SESSION['login_attempts'] > 5) {
+        if (time() - $_SESSION['last_attempt_time'] < 300) { // 5 mins lockout
+            return "Too many attempts. Please wait.";
+        } else {
+            $_SESSION['login_attempts'] = 0;
+        }
+    }
+
     $pdo = get_pdo();
     if (!$pdo)
         return false;
@@ -17,8 +27,12 @@ function login($username, $password)
         $_SESSION['username'] = $user['username'];
         $_SESSION['full_name'] = $user['full_name'];
         $_SESSION['role'] = $user['role'];
+        unset($_SESSION['login_attempts']);
         return true;
     }
+
+    $_SESSION['login_attempts'] = ($_SESSION['login_attempts'] ?? 0) + 1;
+    $_SESSION['last_attempt_time'] = time();
     return false;
 }
 

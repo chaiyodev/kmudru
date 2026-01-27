@@ -21,6 +21,7 @@ if ($target_user_id > 0) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $target_user_id > 0) {
+    verify_csrf_token($_POST['csrf_token'] ?? '');
     $message = $_POST['message'];
     $stmt = $pdo->prepare("INSERT INTO chat_messages (sender_id, receiver_id, message) VALUES (?, ?, ?)");
     $stmt->execute([$user_id, $target_user_id, $message]);
@@ -154,19 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $target_user_id > 0) {
 
 <body>
     <div class="app-container">
-        <aside class="sidebar">
-            <div class="sidebar-brand">
-                <div class="brand-icon"><i data-lucide="book-open"></i></div>
-                <div class="brand-info">
-                    <h1>KM Portal</h1><span>UDRU HUB</span>
-                </div>
-            </div>
-            <nav class="nav-group">
-                <div class="nav-label">เมนูหลัก</div>
-                <a href="index.php" class="nav-link"><i data-lucide="layout"></i>หน้าหลัก</a>
-                <a href="chat.php" class="nav-link active"><i data-lucide="message-square"></i>กล่องข้อความ</a>
-            </nav>
-        </aside>
+        <?php include 'includes/sidebar.php'; ?>
 
         <main class="main-viewport">
             <header class="header-top">
@@ -190,7 +179,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $target_user_id > 0) {
                                 </div>
                                 <div style="flex: 1; overflow: hidden;">
                                     <div style="font-weight: 700;">
-                                        <?php echo htmlspecialchars($u['full_name']); ?>
+                                        <?php echo e($u['full_name']); ?>
                                     </div>
                                     <div
                                         style="font-size: 0.75rem; color: hsl(var(--muted-foreground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
@@ -211,7 +200,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $target_user_id > 0) {
                                     <?php echo strtoupper(substr($target_user['username'], 0, 1)); ?>
                                 </div>
                                 <div style="font-weight: 700;">
-                                    <?php echo htmlspecialchars($target_user['full_name']); ?>
+                                    <?php echo e($target_user['full_name']); ?>
                                 </div>
                             </div>
                             <div style="display: flex; gap: 0.5rem;">
@@ -229,14 +218,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $target_user_id > 0) {
                                 <div style="text-align: center; margin-top: 5rem; color: hsl(var(--muted-foreground));">
                                     <i data-lucide="message-square" style="width: 48px; height: 48px; margin-bottom: 1rem;"></i>
                                     <p>ยังไม่มีข้อความ เริ่มต้นทักทายคุณ
-                                        <?php echo htmlspecialchars($target_user['full_name']); ?> ได้เลย!
+                                        <?php echo e($target_user['full_name']); ?> ได้เลย!
                                     </p>
                                 </div>
                             <?php else: ?>
                                 <?php foreach ($messages as $m): ?>
                                     <div
                                         class="message-bubble <?php echo $m['sender_id'] == $user_id ? 'message-sent' : 'message-received'; ?>">
-                                        <?php echo htmlspecialchars($m['message']); ?>
+                                        <?php echo e($m['message']); ?>
                                         <div style="font-size: 0.625rem; margin-top: 4px; opacity: 0.8; text-align: right;">
                                             <?php echo date('H:i', strtotime($m['created_at'])); ?>
                                         </div>
@@ -245,7 +234,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $target_user_id > 0) {
                             <?php endif; ?>
                         </div>
 
-                        <form action="chat.php?user=<?php echo $target_user_id; ?>" method="POST" class="chat-input-area">
+                        <form action="chat.php?user=<?php echo e($target_user_id); ?>" method="POST"
+                            class="chat-input-area">
+                            <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                             <button type="button" class="btn-primary"
                                 style="background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); padding: 1rem;"><i
                                     data-lucide="plus"></i></button>

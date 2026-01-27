@@ -117,28 +117,28 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                         <div class="stat-icon"><i data-lucide="file-text"></i></div>
                         <span class="stat-label">คลังเอกสาร</span>
                     </div>
-                    <div class="stat-value"><?php echo $stats['document']; ?></div>
+                    <div class="stat-value"><?php echo e($stats['document']); ?></div>
                 </div>
                 <div class="card-stat">
                     <div class="stat-header">
                         <div class="stat-icon"><i data-lucide="pen-tool"></i></div>
                         <span class="stat-label">บทความ Wiki</span>
                     </div>
-                    <div class="stat-value"><?php echo $stats['wiki']; ?></div>
+                    <div class="stat-value"><?php echo e($stats['wiki']); ?></div>
                 </div>
                 <div class="card-stat">
                     <div class="stat-header">
                         <div class="stat-icon"><i data-lucide="message-circle"></i></div>
                         <span class="stat-label">ถาม-ตอบ (Q&A)</span>
                     </div>
-                    <div class="stat-value"><?php echo $stats['qa']; ?></div>
+                    <div class="stat-value"><?php echo e($stats['qa']); ?></div>
                 </div>
                 <div class="card-stat">
                     <div class="stat-header">
                         <div class="stat-icon"><i data-lucide="award"></i></div>
                         <span class="stat-label">ผู้เชี่ยวชาญ</span>
                     </div>
-                    <div class="stat-value"><?php echo $stats['experts']; ?></div>
+                    <div class="stat-value"><?php echo e($stats['experts']); ?></div>
                 </div>
             </div>
 
@@ -158,11 +158,11 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                                 <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
                                     <span class="tag-badge"
                                         style="background: hsl(var(--primary) / 0.1); color: var(--teal-primary);"><?php echo $type_labels[$doc['type']]; ?></span>
-                                    <span class="tag-badge"><?php echo htmlspecialchars($doc['category_name']); ?></span>
+                                    <span class="tag-badge"><?php echo e($doc['category_name']); ?></span>
                                 </div>
                                 <h3
                                     style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.75rem; color: hsl(var(--foreground));">
-                                    <?php echo htmlspecialchars($doc['title']); ?>
+                                    <?php echo e($doc['title']); ?>
                                 </h3>
                                 <p
                                     style="font-size: 0.9375rem; color: hsl(var(--muted-foreground)); line-height: 1.6; margin-bottom: 1.5rem;">
@@ -175,12 +175,12 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                                             <?php echo strtoupper(substr($doc['author_username'] ?? 'U', 0, 2)); ?>
                                         </div>
                                         <span
-                                            style="font-size: 0.875rem; font-weight: 600;"><?php echo htmlspecialchars($doc['author_username'] ?? 'Anonymous'); ?></span>
+                                            style="font-size: 0.875rem; font-weight: 600;"><?php echo e($doc['author_username'] ?? 'Anonymous'); ?></span>
                                     </div>
                                     <div
                                         style="display: flex; gap: 1rem; color: hsl(var(--muted-foreground)); font-size: 0.8125rem;">
                                         <span><i data-lucide="eye" style="width: 14px; vertical-align: middle;"></i>
-                                            <?php echo $doc['views']; ?></span>
+                                            <?php echo e($doc['views']); ?></span>
                                     </div>
                                 </div>
                             </div>
