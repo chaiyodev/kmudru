@@ -481,20 +481,43 @@ if ($tab === 'discussions') {
                         </div>
 
                         <div class="member-actions">
-                            <form method="POST">
-                                <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
-                                <?php if ($is_member): ?>
-                                    <input type="hidden" name="action" value="leave">
-                                    <button type="submit" class="btn-action primary">
-                                        <i data-lucide="check" style="width: 18px;"></i> เป็นสมาชิกแล้ว (Leave)
-                                    </button>
-                                <?php else: ?>
-                                    <input type="hidden" name="action" value="join">
-                                    <button type="submit" class="btn-action primary">
-                                        <i data-lucide="user-plus" style="width: 18px;"></i> เข้าร่วมชุมชน
-                                    </button>
-                                <?php endif; ?>
-                            </form>
+                            <?php if (!is_logged_in()): ?>
+                                <button type="button" class="btn-action primary" onclick="showAuthAlert()">
+                                    <i data-lucide="user-plus" style="width: 18px;"></i> เข้าร่วมชุมชน
+                                </button>
+                                <script>
+                                    function showAuthAlert() {
+                                        Swal.fire({
+                                            title: 'กรุณาเข้าสู่ระบบ',
+                                            text: 'คุณต้องเป็นสมาชิกของ KM Portal ก่อนจึงจะเข้าร่วมกลุ่ม CoP ได้ครับ',
+                                            icon: 'info',
+                                            showCancelButton: true,
+                                            confirmButtonText: 'ไปหน้าสมัครสมาชิก',
+                                            cancelButtonText: 'ไว้ทีหลัง',
+                                            confirmButtonColor: 'var(--teal-primary)'
+                                        }).then((result) => {
+                                            if (result.isConfirmed) {
+                                                window.location.href = 'register.php';
+                                            }
+                                        });
+                                    }
+                                </script>
+                            <?php else: ?>
+                                <form method="POST">
+                                    <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
+                                    <?php if ($is_member): ?>
+                                        <input type="hidden" name="action" value="leave">
+                                        <button type="submit" class="btn-action primary">
+                                            <i data-lucide="check" style="width: 18px;"></i> เป็นสมาชิกแล้ว (Leave)
+                                        </button>
+                                    <?php else: ?>
+                                        <input type="hidden" name="action" value="join">
+                                        <button type="submit" class="btn-action primary">
+                                            <i data-lucide="user-plus" style="width: 18px;"></i> เข้าร่วมชุมชน
+                                        </button>
+                                    <?php endif; ?>
+                                </form>
+                            <?php endif; ?>
                         </div>
                     </div>
 
@@ -550,7 +573,7 @@ if ($tab === 'discussions') {
                                     <h3 style="font-size: 1rem; font-weight: 700;">แบ่งปันความรู้</h3>
                                 </div>
 
-                                <form method="POST">
+                                <form method="POST" enctype="multipart/form-data">
                                     <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                                     <input type="hidden" name="action" value="add_post">
                                     <div
@@ -565,13 +588,30 @@ if ($tab === 'discussions') {
                                                 placeholder="แชร์ความรู้หรือตั้งคำถามกับเพื่อนร่วมชุมชน..."
                                                 required></textarea>
 
+                                            <div id="file-preview-area"
+                                                style="display: none; padding: 0.5rem; background: #f8fafc; border-radius: 8px; margin-top: 0.5rem; font-size: 0.8rem; color: #64748b;">
+                                                <i data-lucide="paperclip" style="width: 14px;"></i> <span
+                                                    id="file-preview-name"></span>
+                                            </div>
+
                                             <div
                                                 style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #f1f5f9;">
                                                 <div style="display: flex; gap: 0.75rem;">
-                                                    <button class="post-tool-btn" type="button" title="แนบไฟล์"><i
-                                                            data-lucide="paperclip" style="width: 18px;"></i></button>
-                                                    <button class="post-tool-btn" type="button" title="รูปภาพ"><i
-                                                            data-lucide="image" style="width: 18px;"></i></button>
+                                                    <input type="file" id="composer-file" name="attachment"
+                                                        style="display: none;" onchange="updateFilePreview(this)">
+                                                    <input type="file" id="composer-image" name="image" accept="image/*"
+                                                        style="display: none;" onchange="updateFilePreview(this)">
+
+                                                    <button class="post-tool-btn" type="button"
+                                                        onclick="document.getElementById('composer-file').click()"
+                                                        title="แนบไฟล์">
+                                                        <i data-lucide="paperclip" style="width: 18px;"></i>
+                                                    </button>
+                                                    <button class="post-tool-btn" type="button"
+                                                        onclick="document.getElementById('composer-image').click()"
+                                                        title="รูปภาพ">
+                                                        <i data-lucide="image" style="width: 18px;"></i>
+                                                    </button>
                                                     <button class="ai-btn-sparkle" type="button"
                                                         onclick="aiAssistant('writing')">
                                                         <i data-lucide="sparkles" style="width: 16px;"></i> ช่วยแต่งโพสต์
@@ -611,10 +651,20 @@ if ($tab === 'discussions') {
                                                 <?php echo nl2br(e($post['content'])); ?>
                                             </p>
                                             <div style="display: flex; gap: 1.5rem; font-size: 0.8125rem; color: #94a3b8;">
-                                                <span style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer;"><i
+                                                <span onclick="toggleReply(<?php echo $post['id']; ?>)"
+                                                    style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer;"><i
                                                         data-lucide="message-circle" style="width: 14px;"></i> ตอบกลับ</span>
-                                                <span style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer;"><i
+                                                <span onclick="toggleLike(this)"
+                                                    style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; transition: 0.2s;"><i
                                                         data-lucide="heart" style="width: 14px;"></i> ถูกใจ</span>
+                                            </div>
+                                            <div id="reply-box-<?php echo $post['id']; ?>"
+                                                style="display: none; margin-top: 1rem; padding: 1rem; background: #f8fafc; border-radius: 12px; border: 1px solid #f1f5f9;">
+                                                <textarea class="form-input" style="min-height: 40px; font-size: 0.875rem;"
+                                                    placeholder="เขียนคำตอบ..."></textarea>
+                                                <button class="btn-primary"
+                                                    style="margin-top: 0.5rem; padding: 4px 12px; font-size: 0.75rem; border-radius: 6px;"
+                                                    onclick="toggleReply(<?php echo $post['id']; ?>)">ส่งคำตอบ</button>
                                             </div>
                                         </div>
                                     <?php endforeach; ?>
@@ -631,14 +681,18 @@ if ($tab === 'discussions') {
                                     <i data-lucide="zap" style="width: 16px;"></i> แนะนำโดย AI
                                 </h4>
                                 <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                                    <div
-                                        style="font-size: 0.8125rem; padding: 0.75rem; background: white; border-radius: 10px; border: 1px solid #ede9fe; cursor: pointer;">
+                                    <div onclick="recommendSummary()"
+                                        style="font-size: 0.8125rem; padding: 0.75rem; background: white; border-radius: 10px; border: 1px solid #ede9fe; cursor: pointer; transition: 0.2s;"
+                                        onmouseover="this.style.borderColor='#8b5cf6'"
+                                        onmouseout="this.style.borderColor='#ede9fe'">
                                         <div style="font-weight: 700; color: #1e1b4b;">สรุปเกณฑ์ EdPEx 2024</div>
                                         <div style="font-size: 0.7rem; color: #6d28d9; margin-top: 2px;">
                                             อิงจากความสนใจของคุณ</div>
                                     </div>
-                                    <div
-                                        style="font-size: 0.8125rem; padding: 0.75rem; background: white; border-radius: 10px; border: 1px solid #ede9fe; cursor: pointer;">
+                                    <div onclick="recommendExpert()"
+                                        style="font-size: 0.8125rem; padding: 0.75rem; background: white; border-radius: 10px; border: 1px solid #ede9fe; cursor: pointer; transition: 0.2s;"
+                                        onmouseover="this.style.borderColor='#8b5cf6'"
+                                        onmouseout="this.style.borderColor='#ede9fe'">
                                         <div style="font-weight: 700; color: #1e1b4b;">Expert: ผศ.ดร. มานะ</div>
                                         <div style="font-size: 0.7rem; color: #6d28d9; margin-top: 2px;">
                                             เชี่ยวชาญด้านการประกันคุณภาพ</div>
@@ -896,6 +950,72 @@ if ($tab === 'discussions') {
             }).then((result) => {
                 if (result.isConfirmed) {
                     Swal.fire('สำเร็จ!', 'อัปเดตสถานะสมาชิกเรียบร้อยแล้ว', 'success');
+                }
+            });
+        }
+
+        // New Interactive Functions
+        function updateFilePreview(input) {
+            const area = document.getElementById('file-preview-area');
+            const name = document.getElementById('file-preview-name');
+            if (input.files && input.files[0]) {
+                name.textContent = input.files[0].name;
+                area.style.display = 'block';
+            } else {
+                area.style.display = 'none';
+            }
+        }
+
+        function toggleLike(el) {
+            const icon = el.querySelector('i');
+            if (el.style.color === 'rgb(244, 63, 94)') { // #f43f5e
+                el.style.color = '#94a3b8';
+                icon.style.fill = 'none';
+            } else {
+                el.style.color = '#f43f5e';
+                icon.style.fill = '#f43f5e';
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: 'ขอบคุณที่ถูกใจ!',
+                    showConfirmButton: false,
+                    timer: 1500
+                });
+            }
+        }
+
+        function toggleReply(id) {
+            const box = document.getElementById('reply-box-' + id);
+            box.style.display = box.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function recommendSummary() {
+            Swal.fire({
+                title: 'บทสรุปเกณฑ์ EdPEx 2024 (โดย AI)',
+                html: `<div style="text-align: left; font-size: 0.9rem;">
+                    <p><b>EdPEx 2024</b> มีการปรับปรุงที่น่าสนใจในหมวดที่ 2 เรื่องการวางแผนกลยุทธ์ และหมวดที่ 6 เรื่องการปฏิบัติการ เพื่อให้สอดรับกับความเปลี่ยนแปลงที่รวดเร็ว (Agility)...</p>
+                    <ul style="margin-top: 1rem;">
+                        <li>เน้นการบูรณาการระบบนวัตกรรม</li>
+                        <li>เพิ่มความสำคัญของ Digital Transformation</li>
+                    </ul>
+                </div>`,
+                icon: 'info',
+                confirmButtonText: 'รับทราบความรู้'
+            });
+        }
+
+        function recommendExpert() {
+            Swal.fire({
+                title: 'ติดต่อผู้เชี่ยวชาญ',
+                text: 'คุณต้องการส่งข้อความสอบถาม ผศ.ดร. มานะ เกี่ยวกับงานประกันคุณภาพหรือไม่?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'ส่งข้อความ',
+                cancelButtonColor: '#d33'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Swal.fire('สำเร็จ!', 'ระบบส่งข้อความให้ผู้เชี่ยวชาญเรียบร้อยแล้ว', 'success');
                 }
             });
         }

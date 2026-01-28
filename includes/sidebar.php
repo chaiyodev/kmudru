@@ -10,8 +10,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <div class="sidebar-brand">
         <div class="brand-icon"><i data-lucide="book-open"></i></div>
         <div class="brand-info">
-            <h1>KM Portal</h1>
-            <span>UDRU HUB</span>
+            <h1>UDRU Wisdom</h1>
+            <span>Knowledge Center</span>
         </div>
     </div>
 
@@ -31,11 +31,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <i data-lucide="message-square"></i>
             <span>กล่องข้อความ</span>
         </a>
-        <a href="ai_assistant.php" class="nav-link <?php echo $current_page == 'ai_assistant.php' ? 'active' : ''; ?>"
-            style="background: rgba(20, 184, 166, 0.1); color: var(--teal-primary); border-left: 3px solid var(--teal-primary);">
+        <a href="ai_assistant.php" class="nav-link <?php echo $current_page == 'ai_assistant.php' ? 'active' : ''; ?>">
             <i data-lucide="bot"></i>
             <span>AI Assistant</span>
-            <span class="ai-badge" style="margin-left: auto;">NEW</span>
         </a>
     </nav>
 
@@ -82,15 +80,16 @@ $current_page = basename($_SERVER['PHP_SELF']);
         <?php endif; ?>
     </nav>
 
-    <div style="margin-top: auto; display: flex; flex-direction: column; gap: 0.5rem;">
+    <div style="margin-top: auto; display: flex; flex-direction: column; gap: 0.5rem; width: 100%;">
         <?php if (is_logged_in()): ?>
-            <div style="padding: 0.75rem; background: hsl(var(--muted)/0.3); border-radius: 12px; margin-bottom: 0.5rem;">
-                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
-                    <div
-                        style="width: 32px; height: 32px; background: var(--teal-primary); border-radius: 8px; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.875rem;">
+            <div class="user-profile-card">
+                <div class="profile-main-info"
+                    style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                    <div class="profile-avatar"
+                        style="width: 32px; height: 32px; background: var(--teal-primary); border-radius: 8px; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.875rem; flex-shrink: 0;">
                         <?php echo strtoupper(substr($_SESSION['username'] ?? 'U', 0, 1)); ?>
                     </div>
-                    <div style="flex: 1; overflow: hidden;">
+                    <div class="profile-info" style="flex: 1; overflow: hidden;">
                         <div
                             style="font-size: 0.875rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                             <?php echo htmlspecialchars($_SESSION['full_name'] ?? $_SESSION['username']); ?>
@@ -100,7 +99,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         </div>
                     </div>
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                <div class="profile-actions" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
                     <a href="profile.php" class="btn-sm"
                         style="text-align: center; background: white; border: 1px solid var(--border-color); border-radius: 6px; padding: 0.25rem; font-size: 0.75rem; color: hsl(var(--foreground)); text-decoration: none;">โปรไฟล์</a>
                     <a href="logout.php" class="btn-sm"
@@ -124,7 +123,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 <!-- Global AI Assistant UI -->
 <div class="ai-float-btn-container">
-    <div class="ai-tooltip">คุณมีคำถามอะไรไหมคะ? ⚡</div>
     <button class="ai-float-btn" onclick="aiAssistant('chat')">
         <i data-lucide="bot-message-square" style="width: 28px; height: 28px;"></i>
     </button>
@@ -133,6 +131,27 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
+    // Theme Manager Script
+    (function () {
+        const savedTheme = localStorage.getItem('theme-primary');
+        const isDarkMode = localStorage.getItem('theme-dark-mode') === 'true';
+
+        if (savedTheme) {
+            document.documentElement.style.setProperty('--primary', savedTheme);
+            document.documentElement.style.setProperty('--teal-primary', `hsl(${savedTheme})`);
+        }
+
+        if (isDarkMode) {
+            document.documentElement.classList.add('dark-mode');
+            // Basic dark mode overrides if not in CSS
+            document.documentElement.style.setProperty('--background', '222 47% 11%');
+            document.documentElement.style.setProperty('--foreground', '210 40% 98%');
+            document.documentElement.style.setProperty('--card', '217 33% 17%');
+            document.documentElement.style.setProperty('--border', '217 33% 25%');
+            document.documentElement.style.setProperty('--muted', '217 33% 20%');
+        }
+    })();
+
     function toggleSidebar() {
         const sidebar = document.getElementById('main-sidebar');
         const body = document.body;

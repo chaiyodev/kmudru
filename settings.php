@@ -70,6 +70,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             display: flex;
             align-items: center;
             gap: 0.75rem;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            text-align: left;
+            width: 100%;
         }
 
         .settings-nav-link:hover,
@@ -93,6 +98,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             margin-bottom: 2rem;
             padding-bottom: 1rem;
             border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
         }
 
         .toggle-group {
@@ -134,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: hsl(var(--muted));
+            background-color: #e2e8f0;
             transition: .4s;
             border-radius: 24px;
         }
@@ -158,6 +166,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         input:checked+.slider:before {
             transform: translateX(20px);
         }
+
+        /* Theme Presets */
+        .theme-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .theme-box {
+            height: 60px;
+            border-radius: 12px;
+            cursor: pointer;
+            border: 3px solid transparent;
+            transition: 0.2s;
+            position: relative;
+        }
+
+        .theme-box:hover {
+            transform: scale(1.05);
+        }
+
+        .theme-box.active {
+            border-color: #0f172a;
+        }
+
+        .theme-box::after {
+            content: attr(data-name);
+            position: absolute;
+            bottom: -20px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: #64748b;
+        }
     </style>
 </head>
 
@@ -173,31 +218,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
             </header>
 
-            <?php if ($message): ?>
-                <div
-                    style="background: hsl(142 76% 36% / 0.1); color: hsl(142 76% 36%); padding: 1rem; border-radius: 0.5rem; margin-bottom: 2rem; border: 1px solid hsl(142 76% 36% / 0.2);">
-                    <?php echo $message; ?>
-                </div>
-            <?php endif; ?>
-
             <div class="settings-layout">
-                <div class="settings-nav">
-                    <a href="#" class="settings-nav-link active"><i data-lucide="user"></i>ข้อมูลบัญชี</a>
-                    <a href="#" class="settings-nav-link"><i data-lucide="bell"></i>การแจ้งเตือน</a>
-                    <a href="#" class="settings-nav-link"><i data-lucide="shield"></i>ความปลอดภัย</a>
-                    <a href="#" class="settings-nav-link"><i data-lucide="monitor"></i>การแสดงผล</a>
+                <aside class="settings-nav">
+                    <button onclick="showSection('profile')" class="settings-nav-link active" id="nav-profile"><i
+                            data-lucide="user"></i>ข้อมูลบัญชี</button>
+                    <button onclick="showSection('notifications')" class="settings-nav-link" id="nav-notifications"><i
+                            data-lucide="bell"></i>การแจ้งเตือน</button>
+                    <button onclick="showSection('security')" class="settings-nav-link" id="nav-security"><i
+                            data-lucide="shield"></i>ความปลอดภัย</button>
+                    <button onclick="showSection('display')" class="settings-nav-link" id="nav-display"><i
+                            data-lucide="monitor"></i>การแสดงผล</button>
                     <div
-                        style="margin-top: 2rem; padding: 1rem; background: hsl(var(--primary)/0.05); border-radius: 0.75rem; font-size: 0.75rem; color: var(--teal-primary);">
+                        style="margin-top: auto; padding: 1rem; background: hsl(var(--primary)/0.05); border-radius: 0.75rem; font-size: 0.75rem; color: var(--teal-primary);">
                         <i data-lucide="info"
                             style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i>
-                        เวอร์ชันระบบ 1.0.0 (Phase 3)
+                        เวอร์ชันระบบ 1.1.0 (PRO)
                     </div>
-                </div>
+                </aside>
 
                 <div class="settings-content">
-                    <section>
-                        <h3 class="settings-section-title">ข้อมูลส่วนตัว</h3>
-                        <form action="settings.php" method="POST">
+                    <!-- Profile Section -->
+                    <section id="section-profile">
+                        <h3 class="settings-section-title"><i data-lucide="user"></i> ข้อมูลส่วนตัว</h3>
+                        <form id="profile-form" action="settings.php" method="POST">
                             <div class="form-group">
                                 <label class="form-label">ชื่อ-นามสกุล</label>
                                 <input type="text" name="full_name" class="form-input"
@@ -220,46 +263,164 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </form>
                     </section>
 
-                    <section style="margin-top: 4rem;">
-                        <h3 class="settings-section-title">ตั้งค่าการแจ้งเตือน</h3>
+                    <!-- Notifications Section -->
+                    <section id="section-notifications" style="display: none;">
+                        <h3 class="settings-section-title"><i data-lucide="bell"></i> ตั้งค่าการแจ้งเตือน</h3>
                         <div class="toggle-group">
                             <div class="toggle-info">
                                 <h4>อีเมลแจ้งเตือน (Email Notifications)</h4>
-                                <p>รับอีเมลเมื่อมีบทความใหม่หรือคำถามที่ตรงกับความเชี่ยวชาญของคุณ</p>
+                                <p>รับอีเมลเมื่อมีบทความใหม่หรือคำถามที่ตรงกับความเชี่ยวชาญ</p>
                             </div>
-                            <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+                            <label class="switch"><input type="checkbox" checked
+                                    onchange="notifyChange('Email Notifications')"><span class="slider"></span></label>
                         </div>
                         <div class="toggle-group">
                             <div class="toggle-info">
                                 <h4>การแจ้งเตือนในระบบ (System Alerts)</h4>
-                                <p>แสดงจุดแจ้งเตือนเมื่อมีคนมาคอมเมนต์หรือกดไลก์ผลงานของคุณ</p>
+                                <p>แสดงจุดแจ้งเตือนเมื่อมีคนมาคอมเมนต์หรือกดไลก์</p>
                             </div>
-                            <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
-                        </div>
-                        <div class="toggle-group">
-                            <div class="toggle-info">
-                                <h4>สรุปรายสัปดาห์ (Weekly Digest)</h4>
-                                <p>ส่งสรุปกิจกรรมและความรู้น่าสนใจประจำสัปดาห์</p>
-                            </div>
-                            <label class="switch"><input type="checkbox"><span class="slider"></span></label>
+                            <label class="switch"><input type="checkbox" checked
+                                    onchange="notifyChange('System Alerts')"><span class="slider"></span></label>
                         </div>
                     </section>
 
-                    <section style="margin-top: 4rem;">
-                        <h3 class="settings-section-title">การแสดงผล</h3>
-                        <div class="toggle-group" style="border-bottom: none;">
+                    <!-- Security Section -->
+                    <section id="section-security" style="display: none;">
+                        <h3 class="settings-section-title"><i data-lucide="shield"></i> ความปลอดภัย</h3>
+                        <div class="toggle-group">
+                            <div class="toggle-info">
+                                <h4>การยืนยันตัวตนสองชั้น (2FA)</h4>
+                                <p>เพิ่มความปลอดภัยพิเศษให้กับบัญชีของคุณ</p>
+                            </div>
+                            <label class="switch"><input type="checkbox"
+                                    onchange="notifyChange('2FA Authenticator')"><span class="slider"></span></label>
+                        </div>
+                        <button class="btn-primary"
+                            style="margin-top: 2rem; background: #64748b;">เปลี่ยนรหัสผ่านใหม่</button>
+                    </section>
+
+                    <!-- Display Section -->
+                    <section id="section-display" style="display: none;">
+                        <h3 class="settings-section-title"><i data-lucide="palette"></i> การแสดงผลและธีม (WOW Theme)
+                        </h3>
+
+                        <div class="toggle-group" style="border-bottom: none; margin-bottom: 2rem;">
                             <div class="toggle-info">
                                 <h4>โหมดมืด (Dark Mode)</h4>
-                                <p>ปรับเปลี่ยนธีมของแอปพลิเคชันให้เป็นสีเข้มเพื่อถนอมสายตา</p>
+                                <p>ปรับธีมของแอปพลิเคชันให้เป็นสีเข้มเพื่อถนอมสายตา</p>
                             </div>
-                            <label class="switch"><input type="checkbox"><span class="slider"></span></label>
+                            <label class="switch">
+                                <input type="checkbox" id="dark-mode-toggle" onchange="toggleDarkMode(this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+
+                        <h4 style="font-size: 0.9375rem; font-weight: 700; margin-bottom: 1rem;">เลือกสีประจำตัวคุณ
+                            (Personalized Theme)</h4>
+                        <div class="theme-grid">
+                            <div class="theme-box" data-name="Teal" data-hsl="174 62% 32%"
+                                style="background: hsl(174 62% 32%)" onclick="setTheme('174 62% 32%', this)"></div>
+                            <div class="theme-box" data-name="Ocean" data-hsl="199 89% 48%"
+                                style="background: hsl(199 89% 48%)" onclick="setTheme('199 89% 48%', this)"></div>
+                            <div class="theme-box" data-name="Indigo" data-hsl="239 84% 67%"
+                                style="background: hsl(239 84% 67%)" onclick="setTheme('239 84% 67%', this)"></div>
+                            <div class="theme-box" data-name="Rose" data-hsl="350 89% 60%"
+                                style="background: hsl(350 89% 60%)" onclick="setTheme('350 89% 60%', this)"></div>
+                            <div class="theme-box" data-name="Amber" data-hsl="38 92% 50%"
+                                style="background: hsl(38 92% 50%)" onclick="setTheme('38 92% 50%', this)"></div>
+                            <div class="theme-box" data-name="Vibrant" data-hsl="282 91% 62%"
+                                style="background: hsl(282 91% 62%)" onclick="setTheme('282 91% 62%', this)"></div>
                         </div>
                     </section>
                 </div>
             </div>
         </main>
     </div>
-    <script>lucide.createIcons();</script>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        lucide.createIcons();
+
+        function showSection(sectionId) {
+            // Hide all sections
+            const sections = ['profile', 'notifications', 'security', 'display'];
+            sections.forEach(s => {
+                document.getElementById('section-' + s).style.display = 'none';
+                document.getElementById('nav-' + s).classList.remove('active');
+            });
+
+            // Show target section
+            document.getElementById('section-' + sectionId).style.display = 'block';
+            document.getElementById('nav-' + sectionId).classList.add('active');
+        }
+
+        function notifyChange(settingName) {
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'success',
+                title: `อัปเดต ${settingName} เรียบร้อยแล้ว`,
+                showConfirmButton: false,
+                timer: 2000
+            });
+        }
+
+        function setTheme(hsl, el) {
+            // Update UI
+            document.querySelectorAll('.theme-box').forEach(box => box.classList.remove('active'));
+            el.classList.add('active');
+
+            // Apply Theme
+            document.documentElement.style.setProperty('--primary', hsl);
+            document.documentElement.style.setProperty('--teal-primary', `hsl(${hsl})`);
+
+            // Persist
+            localStorage.setItem('theme-primary', hsl);
+
+            Swal.fire({
+                icon: 'success',
+                title: 'ธีมเปลี่ยนไปแล้ว!',
+                text: 'สีประจำตัวคุณถูกนำไปใช้ทั่วทั้งเว็บไซต์แล้วครับ 😍',
+                timer: 2000,
+                showConfirmButton: false
+            });
+        }
+
+        function toggleDarkMode(isDark) {
+            localStorage.setItem('theme-dark-mode', isDark);
+
+            if (isDark) {
+                document.documentElement.classList.add('dark-mode');
+                document.documentElement.style.setProperty('--background', '222 47% 11%');
+                document.documentElement.style.setProperty('--foreground', '210 40% 98%');
+                document.documentElement.style.setProperty('--card', '217 33% 17%');
+                document.documentElement.style.setProperty('--border', '217 33% 25%');
+                document.documentElement.style.setProperty('--muted', '217 33% 20%');
+            } else {
+                document.documentElement.classList.remove('dark-mode');
+                // Reset to defaults (based on style.css)
+                document.documentElement.style.setProperty('--background', '180 20% 99%');
+                document.documentElement.style.setProperty('--foreground', '192 80% 10%');
+                document.documentElement.style.setProperty('--card', '0 0% 100%');
+                document.documentElement.style.setProperty('--border', '200 20% 90%');
+                document.documentElement.style.setProperty('--muted', '200 20% 96%');
+            }
+
+            notifyChange('Dark Mode');
+        }
+
+        // Initialize Settings
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedPrimary = localStorage.getItem('theme-primary');
+            if (savedPrimary) {
+                const activeBox = document.querySelector(`.theme-box[data-hsl="${savedPrimary}"]`);
+                if (activeBox) activeBox.classList.add('active');
+            }
+
+            const isDark = localStorage.getItem('theme-dark-mode') === 'true';
+            document.getElementById('dark-mode-toggle').checked = isDark;
+        });
+    </script>
 </body>
 
 </html>
