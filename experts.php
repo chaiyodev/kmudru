@@ -3,9 +3,31 @@ require_once 'includes/db.php';
 require_once 'includes/auth.php';
 $pdo = get_pdo();
 $experts = [];
+$search = isset($_GET['q']) ? $_GET['q'] : '';
+$specialty = isset($_GET['s']) ? $_GET['s'] : '';
+
 if ($pdo) {
-    $stmt = $pdo->query("SELECT *, (SELECT COUNT(*) FROM documents WHERE user_id = users.id) as doc_count FROM users WHERE role != 'reader' ORDER BY points DESC LIMIT 10");
+    $sql = "SELECT u.*, (SELECT COUNT(*) FROM documents WHERE user_id = u.id) as doc_count 
+            FROM users u 
+            WHERE u.role != 'reader'";
+
+    $params = [];
+    if ($search) {
+        $sql .= " AND (u.full_name LIKE ? OR u.specialty LIKE ?)";
+        $params[] = "%$search%";
+        $params[] = "%$search%";
+    }
+    if ($specialty) {
+        $sql .= " AND u.specialty = ?";
+        $params[] = $specialty;
+    }
+
+    $sql .= " ORDER BY u.points DESC LIMIT 20";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
     $experts = $stmt->fetchAll();
+
+    $specialties = $pdo->query("SELECT DISTINCT specialty FROM users WHERE specialty IS NOT NULL AND specialty != ''")->fetchAll(PDO::FETCH_COLUMN);
 }
 ?>
 <!DOCTYPE html>
@@ -14,7 +36,7 @@ if ($pdo) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>รายชื่อผู้เชี่ยวชาญ | KM Portal</title>
+    <title>รายชื่อผู้เชี่ยวชาญ | UDRU Wisdom</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
@@ -33,7 +55,41 @@ if ($pdo) {
                     <p>รวบรวมบุคลากรที่มีความรู้ความสามารถโดดเด่นในแต่ละสาขา</p>
                 </div>
             </header>
+
+            <!-- Search & Filters -->
+            <div
+                style="background: white; padding: 1.5rem; border-radius: 1rem; border: 1px solid var(--border-color); margin-bottom: 2rem;">
+                <form method="GET" style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 300px; position: relative;">
+                        <i data-lucide="search"
+                            style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8; width: 18px;"></i>
+                        <input type="text" name="q" class="form-input" placeholder="ค้นหาชื่อผู้เชี่ยวชาญ หรือทักษะ..."
+                            style="padding-left: 3rem;" value="<?php echo e($search); ?>">
+                    </div>
+                    <select name="s" class="form-input" style="width: 200px;">
+                        <option value="">ทุกความเชี่ยวชาญ</option>
+                        <?php foreach ($specialties as $s): ?>
+                            <option value="<?php echo e($s); ?>" <?php echo $specialty == $s ? 'selected' : ''; ?>>
+                                <?php echo e($s); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <button type="submit" class="btn-primary" style="padding: 0.5rem 2rem;">ค้นหา</button>
+                    <?php if ($search || $specialty): ?>
+                        <a href="experts.php" class="btn-primary"
+                            style="background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));">ล้างค่า</a>
+                    <?php endif; ?>
+                </form>
+            </div>
+
             <div class="knowledge-grid" style="grid-template-columns: 1fr;">
+                <?php if (empty($experts)): ?>
+                    <div
+                        style="padding: 4rem; text-align: center; background: white; border-radius: 1rem; border: 1px dashed var(--border-color);">
+                        <i data-lucide="user-plus"
+                            style="width: 48px; height: 48px; margin-bottom: 1rem; opacity: 0.5;"></i>
+                        <p>ไม่พบผู้เชี่ยวชาญที่ตรงกับเงื่อนไข</p>
+                    </div>
+                <?php endif; ?>
                 <?php foreach ($experts as $expert): ?>
                     <div class="card-knowledge" style="flex-direction: row; align-items: center; gap: 2rem;">
                         <div

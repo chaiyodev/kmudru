@@ -33,7 +33,7 @@ $categories = $pdo->query("SELECT c.*, (SELECT COUNT(*) FROM documents WHERE cat
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>จัดการหมวดหมู่ | KM Portal</title>
+    <title>จัดการหมวดหมู่ | UDRU Wisdom</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"

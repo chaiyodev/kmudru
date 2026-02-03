@@ -1,6 +1,7 @@
 <?php
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/logger.php';
 
 $pdo = get_pdo();
 $user = null;
@@ -12,83 +13,138 @@ if (is_logged_in()) {
 }
 
 $query = isset($_GET['q']) ? trim($_GET['q']) : '';
-$results = [];
 
-// Helper function to clean query (Semantic-ish cleaning)
-function clean_km_query($q)
-{
-    // Remove punctuation and common Thai stop words
-    $punctuation = ["?", "!", ".", ",", "(", ")"];
-    $stop_words = ["มี", "อะไร", "บ้าง", "ใน", "ระบบ", "ช่วย", "แสดง", "หน่อย", "ที่", "ครับ", "ค่ะ", "วิธี", "การ", "หนู", "ผม"];
+if (isset($_POST['ajax_chat'])) {
+    header('Content-Type: application/json');
+    $msg = trim($_POST['message'] ?? '');
 
-    $q = str_replace($punctuation, "", $q);
-    $cleaned = str_replace($stop_words, " ", $q);
-
-    return trim($cleaned);
-}
-
-if ($query !== '') {
-    $clean_query = clean_km_query($query);
-
-    // If cleaning made it too short or empty, try at least one keyword
-    if (mb_strlen($clean_query) < 2) {
-        $clean_query = $query;
+    if (empty($msg)) {
+        echo json_encode(['error' => 'Empty message']);
+        exit;
     }
 
-    $search_term = "%$clean_query%";
+    log_activity('ai_chat', 'question', $msg);
 
-    // 1. Search Documents & Wiki
-    $stmt = $pdo->prepare("SELECT 'document' as origin, title, content as body FROM documents WHERE (title LIKE ? OR content LIKE ?) AND status = 'published' LIMIT 3");
-    $stmt->execute([$search_term, $search_term]);
-    $results = array_merge($results, $stmt->fetchAll());
+    // --- SMART INTELLIGENCE LOGIC (RAG-lite) ---
 
-    // 2. Search Experts
-    $stmt = $pdo->prepare("SELECT 'expert' as origin, full_name as title, specialty as body FROM users WHERE (full_name LIKE ? OR specialty LIKE ?) AND role IN ('admin', 'contributor') LIMIT 2");
-    $stmt->execute([$search_term, $search_term]);
-    $results = array_merge($results, $stmt->fetchAll());
+    // 1. Detect Intent
+    $msg_lower = mb_strtolower($msg);
+    $intent = 'search';
 
-    // 3. Search Trainings (Handling "training/courses" specifically)
-    $is_training_query = false;
-    $training_keywords = ['อบรม', 'หลักสูตร', 'เรียน', 'คอร์ส', 'training', 'course'];
-    foreach ($training_keywords as $kw) {
-        if (mb_stripos($query, $kw) !== false) {
-            $is_training_query = true;
+    if (preg_match('/(จำนวน|กี่|เท่าไหร่|สรุปสถิติ|สถิติ)/u', $msg_lower))
+        $intent = 'stats';
+    else if (preg_match('/(ยอดนิยม|ดัง|มีคนอ่านเยอะ|popular)/u', $msg_lower))
+        $intent = 'popular';
+    else if (preg_match('/(ล่าสุด|ใหม่|เพิ่ง|recent)/u', $msg_lower))
+        $intent = 'latest';
+    else if (preg_match('/(อบรม|สัมมนา|เรียน|คอร์ส|training|course)/u', $msg_lower))
+        $intent = 'training';
+    else if (preg_match('/(คืออะไร|แปลว่า|หมายความว่า|คือ)/u', $msg_lower))
+        $intent = 'define';
+    else if (preg_match('/(ใคร|คนไหน|ผู้เชี่ยวชาญ|expert|คนเก่ง)/u', $msg_lower))
+        $intent = 'expert';
+
+    $results = [];
+    $ai_response = "";
+
+    switch ($intent) {
+        case 'stats':
+            $total_docs = $pdo->query("SELECT COUNT(*) FROM documents")->fetchColumn();
+            $total_users = $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
+            $total_cop = $pdo->query("SELECT COUNT(*) FROM communities")->fetchColumn();
+            $ai_response = "📊 **สรุปภาพรวมฐานข้อมูลปัญญา UDRU ในขณะนี้ครับ**:\n\n" .
+                "- 📄 **คลังความรู้สะสม:** " . number_format($total_docs) . " บทความ\n" .
+                "- 👤 **นักจัดการความรู้:** " . number_format($total_users) . " ท่าน\n" .
+                "- 🤝 **ชุมชนแนวปฏิบัติ (CoP):** " . number_format($total_cop) . " กลุ่ม\n\n" .
+                "สถานะระบบ: **ยอดนิยมและอัปเดตต่อเนื่อง** ท่านต้องการเจาะลึกที่ส่วนไหนเป็นพิเศษไหมครับ?";
             break;
+
+        case 'popular':
+            $stmt = $pdo->query("SELECT id, title, content as body FROM documents WHERE status = 'published' ORDER BY views DESC LIMIT 3");
+            $results = $stmt->fetchAll();
+            $ai_response = "🔥 **นี่คือ 3 สุดยอดเนื้อหาที่ได้รับความนิยมสูงสุด (Top Viewed) ในขณะนี้ครับ:**\n\n";
+            break;
+
+        case 'latest':
+            $stmt = $pdo->query("SELECT id, title, content as body FROM documents WHERE status = 'published' ORDER BY created_at DESC LIMIT 3");
+            $results = $stmt->fetchAll();
+            $ai_response = "🆕 **ผมรวบรวมข้อมูลที่เพิ่งอัปเดตใหม่ล่าสุดเข้ามาในระบบมาให้แล้วครับ:**\n\n";
+            break;
+
+        case 'training':
+            $stmt = $pdo->query("SELECT id, title, description as body FROM trainings ORDER BY created_at DESC LIMIT 3");
+            $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($results as &$r) {
+                $r['origin'] = 'training';
+            }
+            $ai_response = "🎓 **หลักสูตรอบรมแนะนำเพื่อการพัฒนาทักษะ (Skill Up) ของคุณ:**\n\n";
+            break;
+
+        case 'expert':
+            $clean_name = str_replace(['ใคร', 'คือ', 'คนไหน', 'ผู้เชี่ยวชาญ', 'หา'], '', $msg);
+            $stmt = $pdo->prepare("SELECT id, full_name as title, specialty as body FROM users WHERE (full_name LIKE ? OR specialty LIKE ?) AND role != 'reader' LIMIT 3");
+            $stmt->execute(["%$clean_name%", "%$clean_name%"]);
+            $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($results as &$r) {
+                $r['origin'] = 'expert';
+            }
+            $ai_response = "👤 **จากการสืบค้นรายชื่อผู้เชี่ยวชาญ ผมพบรายชื่อที่น่าจะช่วยเหลือคุณได้ดังนี้ครับ:**\n\n";
+            break;
+
+        default:
+            // Advanced Keyword Extraction
+            $clean_query = str_replace(["?", "!", "ค่ะ", "ครับ", "ช่วย", "หน่อย", "คือ", "หา"], "", $msg);
+            $keywords = explode(' ', $clean_query);
+            $keywords = array_filter($keywords, function ($v) {
+                return mb_strlen($v) > 1; });
+            if (empty($keywords))
+                $keywords = [$clean_query];
+
+            foreach ($keywords as $kw) {
+                $term = "%$kw%";
+                // Search Documents
+                $stmt = $pdo->prepare("SELECT id, 'document' as origin, title, content as body FROM documents WHERE (title LIKE ? OR content LIKE ?) AND status = 'published' ORDER BY views DESC LIMIT 2");
+                $stmt->execute([$term, $term]);
+                $results = array_merge($results, $stmt->fetchAll());
+                if (count($results) > 4)
+                    break;
+            }
+
+            // Deduplicate
+            $temp = [];
+            foreach ($results as $r) {
+                $temp[$r['title']] = $r;
+            }
+            $results = array_values($temp);
+
+            if (empty($results)) {
+                $ai_response = "🤔 **ผมลองพยายามสืบค้นเกี่ยวกับ \"$msg\" แล้ว แต่ยังไม่เจอข้อมูลที่ตรงกันเป๊ะๆ เลยครับ**\n\n" .
+                    "**คำแนะนำ:**\n" .
+                    "- ลองเปลี่ยนมาใช้คำสั้นๆ เช่น \"EdPEx\", \"KPI\" หรือ \"งบประมาณ\"\n" .
+                    "- สอบถามข้อมูลตามหน่วยงาน เช่น \"ฝ่ายบุคคล\", \"วิทยบริการ\"\n" .
+                    "- หรือลองถามผมว่า \"มีบทความใหม่ล่าสุดอะไรบ้าง\" ดูนะครับ";
+            } else {
+                $ai_response = "💡 **จากการสืบค้นคลังปัญญา UDRU ผมสรุปข้อมูลที่เกี่ยวข้องกับข้อซักถามของคุณได้ดังนี้ครับ:**\n\n";
+            }
+            break;
+    }
+
+    // Build the Synthesis with Source Links
+    if (!empty($results)) {
+        foreach ($results as $idx => $res) {
+            $origin = $res['origin'] ?? 'document';
+            $icon = ($origin == 'expert') ? '👤' : (($origin == 'training') ? '🎓' : '📄');
+            $url = ($origin == 'training') ? "training_view.php?id=" . $res['id'] : (($origin == 'expert') ? "experts.php?q=" . urlencode($res['title']) : "view.php?id=" . $res['id']);
+
+            $ai_response .= "### " . ($idx + 1) . ". $icon " . $res['title'] . "\n";
+            $ai_response .= "> " . mb_strimwidth(strip_tags($res['body'] ?? ''), 0, 150, "...") . "\n\n";
+            $ai_response .= "[🌐 อ่านรายละเอียดเพิ่มเติม]($url)\n\n";
         }
+        $ai_response .= "---\n*ข้อมูลสรุปโดยระบบ AI Assistant ท่านสามารถถามเจาะลึกในแต่ละหัวข้อได้ทันทีครับ*";
     }
 
-    if ($is_training_query) {
-        $stmt = $pdo->prepare("SELECT 'training' as origin, title, description as body FROM trainings WHERE (title LIKE ? OR description LIKE ?) LIMIT 5");
-        $stmt->execute([$search_term, $search_term]);
-        $training_results = $stmt->fetchAll();
-
-        if (empty($training_results)) {
-            $stmt = $pdo->query("SELECT 'training' as origin, title, description as body FROM trainings ORDER BY created_at DESC LIMIT 3");
-            $training_results = $stmt->fetchAll();
-        }
-        $results = array_merge($results, $training_results);
-    }
-
-    // 4. Handle "Popular Articles" specifically
-    if (str_contains($query, 'ยอดนิยม')) {
-        $stmt = $pdo->query("SELECT 'document' as origin, title, content as body FROM documents WHERE status = 'published' ORDER BY views DESC LIMIT 3");
-        $results = array_merge($results, $stmt->fetchAll());
-    }
-
-    // 5. Handle "How to use" guide
-    if (str_contains($query, 'วิธีใช้งาน') || str_contains($query, 'คู่มือ')) {
-        $results[] = [
-            'origin' => 'guide',
-            'title' => 'คู่มือการใช้งานระบบ KM Portal',
-            'body' => 'ระบบ KM Portal ออกแบบมาเพื่อช่วยให้คุณเข้าถึงความรู้ได้ง่ายขึ้น: 1. ใช้ช่องค้นหา AI เพื่อถามคำถาม 2. เข้าสู่เครือข่าย CoP เพื่อแลกเปลี่ยนความรู้ 3. ติดต่อผู้เชี่ยวชาญผ่านระบบส่งข้อความ'
-        ];
-    }
-
-    // 6. Special Case for "What documents are there?"
-    if (count($results) < 2 && (str_contains($query, 'เอกสาร') || str_contains($query, 'ไฟล์'))) {
-        $stmt = $pdo->query("SELECT 'document' as origin, title, content as body FROM documents WHERE status = 'published' ORDER BY created_at DESC LIMIT 3");
-        $results = array_merge($results, $stmt->fetchAll());
-    }
+    echo json_encode(['response' => $ai_response]);
+    exit;
 }
 ?>
 <!DOCTYPE html>
@@ -97,21 +153,145 @@ if ($query !== '') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Assistant | KM Portal</title>
+    <title>UDRU AI Workspace</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
-        .ai-center-container {
-            max-width: 900px;
-            margin: 4rem auto;
-            text-align: center;
-            animation: fadeIn 0.6s ease-out;
+        :root {
+            --chat-bg: #f8fafc;
+            --sidebar-w: 300px;
+            --accent: #14b8a6;
+            --accent-glow: rgba(20, 184, 166, 0.15);
         }
 
-        @keyframes fadeIn {
+        * {
+            box-sizing: border-box;
+        }
+
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            width: 100%;
+            background: var(--chat-bg);
+            font-family: 'Plus Jakarta Sans', 'Sarabun', sans-serif;
+            overflow: hidden;
+        }
+
+        .workspace-container {
+            display: grid;
+            grid-template-columns: var(--sidebar-w) 1fr;
+            height: 100vh;
+            width: 100%;
+        }
+
+        /* --- Sidebar UI --- */
+        .workspace-sidebar {
+            background: #ffffff;
+            border-right: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            padding: 1.5rem;
+            z-index: 50;
+        }
+
+        .sidebar-logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 2rem;
+        }
+
+        .logo-box {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--accent), #0ea5e9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            box-shadow: 0 4px 12px var(--accent-glow);
+        }
+
+        .nav-group {
+            margin-bottom: 2rem;
+        }
+
+        .nav-label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: #94a3b8;
+            text-transform: uppercase;
+            margin-bottom: 0.75rem;
+        }
+
+        .nav-item {
+            padding: 0.75rem 1rem;
+            border-radius: 10px;
+            color: #475569;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: 0.2s;
+        }
+
+        .nav-item:hover {
+            background: #f1f5f9;
+            color: #0f172a;
+        }
+
+        .nav-item.active {
+            background: #f0fdfa;
+            color: var(--accent);
+        }
+
+        /* --- Main Chat UI --- */
+        .chat-area {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+            background: radial-gradient(circle at top right, #f0fdfa, transparent),
+                radial-gradient(circle at bottom left, #eff6ff, transparent);
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 3rem 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            scroll-behavior: smooth;
+        }
+
+        .messages-inner {
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .message {
+            display: flex;
+            gap: 1.25rem;
+            width: 100%;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
             from {
                 opacity: 0;
                 transform: translateY(10px);
@@ -123,426 +303,412 @@ if ($query !== '') {
             }
         }
 
-        .ai-hero-icon {
-            width: 100px;
-            height: 100px;
-            background: linear-gradient(135deg, #f0fdfa 0%, #e0f2fe 100%);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 2rem;
-            color: var(--teal-primary);
-            box-shadow: 0 20px 40px -10px rgba(20, 184, 166, 0.2);
+        .m-user {
+            flex-direction: row-reverse;
         }
 
-        .prompt-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
-            margin-top: 3rem;
-        }
-
-        .prompt-card {
-            background: white;
-            border: 1px dashed #e2e8f0;
-            padding: 1.5rem;
-            border-radius: 1.25rem;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            cursor: pointer;
-            transition: 0.3s;
-            text-align: left;
-        }
-
-        .prompt-card:hover {
-            border-color: var(--teal-primary);
-            background: #f0fdfa;
-            transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(20, 184, 166, 0.1);
-        }
-
-        .prompt-icon {
+        .avatar {
             width: 40px;
             height: 40px;
-            background: #f8fafc;
-            border-radius: 10px;
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .a-bot {
+            background: var(--accent);
+            color: white;
+            box-shadow: 0 4px 12px var(--accent-glow);
+        }
+
+        .a-user {
+            background: #0f172a;
+            color: white;
+        }
+
+        .bubble {
+            max-width: 80%;
+            padding: 1rem 1.25rem;
+            border-radius: 1.25rem;
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+
+        .b-bot {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-top-left-radius: 4px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+        }
+
+        .b-user {
+            background: #0f172a;
+            color: white;
+            border-top-right-radius: 4px;
+        }
+
+        /* --- Typo in Bubbles --- */
+        .bubble h3 {
+            margin: 1rem 0 0.5rem;
+            color: var(--accent);
+            font-size: 1.1rem;
+        }
+
+        .bubble blockquote {
+            margin: 0.75rem 0;
+            padding: 0.5rem 1rem;
+            border-left: 3px solid #e2e8f0;
+            color: #64748b;
+            font-style: italic;
+            background: #fbfcfd;
+            border-radius: 4px;
+        }
+
+        .bubble a {
+            color: var(--accent);
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .bubble a:hover {
+            text-decoration: underline;
+        }
+
+        /* --- Input Area --- */
+        .input-sticky {
+            padding: 2rem;
+            padding-top: 0;
+            background: linear-gradient(to top, var(--chat-bg) 70%, transparent);
+        }
+
+        .input-bar {
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 1.5rem;
+            padding: 0.75rem 1.25rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.1);
+            transition: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .input-bar:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 20px 60px -15px var(--accent-glow);
+            transform: translateY(-2px);
+        }
+
+        #chat-input {
+            flex: 1;
+            border: none;
+            outline: none;
+            font-size: 1rem;
+            padding: 0.5rem 0;
+            background: transparent;
+            color: #0f172a;
+        }
+
+        .btn-circle {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            cursor: pointer;
+            transition: 0.2s;
+            background: #f1f5f9;
             color: #64748b;
         }
 
-        .search-area {
-            margin-top: 3rem;
-            position: relative;
+        .btn-send {
+            background: var(--accent) !important;
+            color: white !important;
         }
 
-        .search-input-lg {
-            width: 100%;
-            padding: 1.5rem 4rem;
-            border-radius: 1.5rem;
-            border: 2px solid #e2e8f0;
-            font-size: 1.1rem;
-            outline: none;
-            transition: 0.3s;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+        .btn-send:hover {
+            transform: scale(1.05);
         }
 
-        .search-input-lg:focus {
-            border-color: var(--teal-primary);
-            box-shadow: 0 20px 40px -10px rgba(20, 184, 166, 0.15);
-        }
-
-        .ai-result-card {
-            background: white;
-            border-radius: 1.5rem;
+        /* --- Hero States --- */
+        .hero {
+            text-align: center;
+            margin: auto;
+            max-width: 700px;
             padding: 2rem;
+        }
+
+        .hero h2 {
+            font-size: 2.75rem;
+            font-weight: 800;
+            color: #0f172a;
+            margin-bottom: 1rem;
+            letter-spacing: -0.04em;
+        }
+
+        .hero p {
+            color: #64748b;
+            font-size: 1.1rem;
+        }
+
+        .suggest-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 2.5rem;
+        }
+
+        .suggest-card {
+            background: white;
             border: 1px solid #e2e8f0;
-            text-align: left;
-            margin-top: 2rem;
-            animation: slideUp 0.4s ease-out;
-        }
-
-        .ai-tooltip { 
-            background: white; 
-            padding: 6px 12px; 
-            border-radius: 10px; 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
-            font-size: 0.75rem; 
-            font-weight: 700; 
-            color: #14b8a6; 
-            border: 1px solid #ccfbf1; 
-            animation: ai-bounce 2s infinite; 
-            pointer-events: none; /* Prevent blocking clicks */
-        }
-
-        .file-upload-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            background: #f1f5f9;
-            padding: 4px 12px;
-            border-radius: 100px;
-            font-size: 0.75rem;
-            color: #475569;
-            margin-top: 1rem;
-            border: 1px solid #e2e8f0;
-        }
-
-        .file-icon-btn {
-            background: none;
-            border: none;
-            color: #94a3b8;
+            padding: 1.25rem;
+            border-radius: 1.25rem;
             cursor: pointer;
             transition: 0.2s;
+            text-align: left;
             display: flex;
             align-items: center;
-            justify-content: center;
+            gap: 1rem;
         }
 
-        .file-icon-btn:hover {
-            color: var(--teal-primary);
+        .suggest-card:hover {
+            border-color: var(--accent);
+            background: #f0fdfa;
+            transform: translateY(-2px);
+        }
+
+        /* --- Typing Dot Indicator --- */
+        .typing {
+            display: flex;
+            gap: 4px;
+            padding: 0.75rem 1rem;
+            background: #f1f5f9;
+            border-radius: 1rem;
+            width: fit-content;
+        }
+
+        .dot {
+            width: 6px;
+            height: 6px;
+            background: #94a3b8;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        .dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 0.3;
+                transform: scale(0.8);
+            }
+
+            50% {
+                opacity: 1;
+                transform: scale(1.2);
+            }
         }
     </style>
 </head>
 
 <body>
-    <div class="app-container">
-        <?php include 'includes/sidebar.php'; ?>
 
-        <main class="main-viewport">
-            <header class="header-top" style="justify-content: flex-end;">
-                <div class="header-actions" style="display: flex; align-items: center; gap: 1.5rem;">
-                    <a href="ai_assistant.php" class="btn-primary" style="text-decoration: none;">
-                        <i data-lucide="plus"></i>สร้างการสนทนาใหม่
-                    </a>
-                    <div style="position: relative; display: flex; align-items: center;">
-                        <i data-lucide="bell" style="color: #64748b; cursor: pointer; width: 22px; height: 22px;"></i>
-                        <span style="position: absolute; top: -8px; right: -8px; background: #f59e0b; color: white; font-size: 10px; padding: 2px 5px; border-radius: 10px; font-weight: 700; border: 2px solid white;">3</span>
-                    </div>
-                </div>
-            </header>
-
-            <div class="ai_header_card"
-                style="background: white; padding: 1.5rem; border-radius: 1.5rem; border: 1px solid #f1f5f9; display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem;">
-                <div
-                    style="width: 48px; height: 48px; background: #14b8a6; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white;">
-                    <i data-lucide="bot"></i>
-                </div>
-                <div>
-                    <div style="font-weight: 700; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
-                        KM AI Assistant <span class="ai-badge">Powered by AI</span>
-                    </div>
-                    <div style="font-size: 0.875rem; color: #94a3b8;">ถามคำถามเกี่ยวกับความรู้ในองค์กร</div>
+    <div class="workspace-container">
+        <aside class="workspace-sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-box"><i data-lucide="bot"></i></div>
+                <div style="font-weight: 800; font-size: 1.2rem; display: flex; flex-direction: column;">
+                    UDRU AI
+                    <span
+                        style="font-size: 0.6rem; color: #94a3b8; font-weight: 800; text-transform: uppercase;">Workspace
+                        v2.0</span>
                 </div>
             </div>
 
-            <div class="ai-center-container">
-                <?php if ($query === ''): ?>
-                    <div class="ai-hero-icon">
-                        <i data-lucide="bot" style="width: 48px; height: 48px;"></i>
+            <div class="nav-group">
+                <div class="nav-label">General</div>
+                <a href="javascript:void(0)" onclick="location.reload()" class="nav-item active">
+                    <i data-lucide="message-square" style="width: 18px;"></i> New Conversation
+                </a>
+                <a href="index.php" class="nav-item">
+                    <i data-lucide="home" style="width: 18px;"></i> Homepage
+                </a>
+            </div>
+
+            <div class="nav-group" style="flex: 1;">
+                <div class="nav-label">Historical Activity</div>
+                <div
+                    style="text-align: center; color: #cbd5e1; font-size: 0.8rem; padding: 2rem 0; font-style: italic;">
+                    History is cleared on reload
+                </div>
+            </div>
+
+            <div class="sidebar-footer" style="padding-top: 1rem; border-top: 1px solid #f1f5f9;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <div
+                        style="width: 32px; height: 32px; border-radius: 8px; background: #0f172a; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.8rem;">
+                        <?php echo isset($user['username']) ? strtoupper(substr($user['username'], 0, 2)) : 'G'; ?>
                     </div>
-
-                    <h1 style="font-size: 2.25rem; font-weight: 800; color: #0f172a; margin-bottom: 1rem;">สวัสดีครับ! ผมคือ
-                        AI Assistant</h1>
-                    <p style="font-size: 1.1rem; color: #64748b; max-width: 600px; margin: 0 auto;">
-                        ผมช่วยค้นหาและตอบคำถามเกี่ยวกับความรู้ในองค์กรได้ ลองถามผมได้เลย!</p>
-
-                    <form id="ai-main-form" class="search-area" onsubmit="event.preventDefault(); handleAISubmit();">
-                        <i data-lucide="sparkles"
-                            style="position: absolute; left: 1.5rem; top: 50%; transform: translateY(-50%); color: var(--teal-primary);"></i>
-                        <input type="text" name="q" id="ai-query-input" class="search-input-lg"
-                            placeholder="พิมพ์คำถาม หรือส่งไฟล์ให้ AI ช่วยสรุป..." value="<?php echo e($query); ?>" autocomplete="off">
-                        
+                    <div style="overflow: hidden;">
                         <div
-                            style="position: absolute; right: 8.5rem; top: 50%; transform: translateY(-50%); display: flex; gap: 0.5rem; align-items: center;">
-                            <input type="file" id="ai-file-input" style="display: none;" onchange="handleFileSelect(event)">
-                            <button type="button" class="file-icon-btn"
-                                onclick="document.getElementById('ai-file-input').click()" title="แนบไฟล์ PDF/Word">
-                                <i data-lucide="paperclip" style="width: 22px;"></i>
-                            </button>
-                        </div>
-
-                        <button type="submit" class="btn-primary"
-                            style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); padding: 0.75rem 1.5rem; border-radius: 1rem; border: none; cursor: pointer;">ส่งคำถาม</button>
-                    </form>
-
-                    <div id="file-preview-area" style="display: none; justify-content: center;">
-                        <div class="file-upload-badge">
-                            <i data-lucide="file" style="width: 14px;"></i>
-                            <span id="selected-filename">filename.pdf</span>
-                            <i data-lucide="x" style="width: 14px; cursor: pointer;" onclick="clearFile()"></i>
+                            style="font-weight: 700; font-size: 0.85rem; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            <?php echo isset($user['full_name']) ? e($user['full_name']) : 'Guest User'; ?>
                         </div>
                     </div>
+                </div>
+            </div>
+        </aside>
 
-                    <div class="prompt-grid">
-                        <div class="prompt-card" onclick="setSearch('มีเอกสารอะไรบ้างในระบบ?')">
-                            <div class="prompt-icon"><i data-lucide="file-text"></i></div>
-                            <div style="font-weight: 600; color: #475569;">มีเอกสารอะไรบ้างในระบบ?</div>
+        <main class="chat-area">
+            <div class="chat-messages" id="chat-scroller">
+                <div class="messages-inner" id="message-container">
+                    <div class="hero" id="welcome-state">
+                        <div
+                            style="width: 70px; height: 70px; background: white; border-radius: 20px; display: flex; align-items: center; justify-content: center; color: var(--accent); margin: 0 auto 1.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.05);">
+                            <i data-lucide="sparkles" style="width: 36px; height: 36px;"></i>
                         </div>
-                        <div class="prompt-card" onclick="setSearch('บทความยอดนิยมมีอะไรบ้าง?')">
-                            <div class="prompt-icon"><i data-lucide="book-open"></i></div>
-                            <div style="font-weight: 600; color: #475569;">บทความยอดนิยมมีอะไรบ้าง?</div>
-                        </div>
-                        <div class="prompt-card" onclick="setSearch('วิธีใช้งานระบบ KM?')">
-                            <div class="prompt-icon"><i data-lucide="help-circle"></i></div>
-                            <div style="font-weight: 600; color: #475569;">วิธีใช้งานระบบ KM?</div>
-                        </div>
-                        <div class="prompt-card" onclick="setSearch('มีหลักสูตรอบรมอะไรบ้าง?')">
-                            <div class="prompt-icon"><i data-lucide="graduation-cap"></i></div>
-                            <div style="font-weight: 600; color: #475569;">มีหลักสูตรอบรมอะไรบ้าง?</div>
-                        </div>
-                    </div>
-                <?php else: ?>
-                    <div style="text-align: left;">
-                        <a href="ai_assistant.php"
-                            style="color: var(--teal-primary); text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 600; margin-bottom: 2rem;">
-                            <i data-lucide="arrow-left" style="width: 18px;"></i> กลับไปหน้าถามตอบ
-                        </a>
+                        <h2>How can I assist you?</h2>
+                        <p>I'm your UDRU Wisdom Assistant. Search for documents, experts, or training courses with
+                            natural language.</p>
 
-                        <div class="ai-result-card">
-                            <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
-                                <div
-                                    style="width: 40px; height: 40px; background: var(--teal-primary); color: white; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                                    <i data-lucide="bot" style="width: 24px;"></i>
-                                </div>
-                                <div>
-                                    <div style="font-weight: 700; color: #0f172a;">AI Smart Response</div>
-                                    <div style="font-size: 0.8rem; color: #94a3b8;">วิเคราะห์ข้อมูลจากคลังความรู้ UDRU</div>
-                                </div>
+                        <div class="suggest-grid">
+                            <div class="suggest-card" onclick="ask('สรุปผลกิจกรรมล่าสุดในระบบ')">
+                                <i data-lucide="trending-up" style="color: #f59e0b; width: 22px;"></i>
+                                <span>สรุปผลกิจกรรมล่าสุดในระบบ</span>
                             </div>
-
-                            <div style="line-height: 1.8; color: #334155; font-size: 1.05rem;">
-                                <?php if (empty($results)): ?>
-                                    <p>ขออภัยครับ ผมไม่พบข้อมูลที่เกี่ยวข้องกับ <strong>"<?php echo e($query); ?>"</strong>
-                                        ในคลังความรู้ปัจจุบัน...</p>
-                                    <p style="margin-top: 1rem; color: #64748b; font-size: 0.9rem;">คำแนะนำ:
-                                        ลองใช้คำค้นหาที่กว้างขึ้น หรือสอบถามผู้เชี่ยวชาญโดยตรงผ่านเมนู "รายชื่อผู้เชี่ยวชาญ"
-                                        ครับ</p>
-                                <?php else: ?>
-                                    <p>จากการวิเคราะห์ฐานข้อมูล ผมพบผลลัพธ์ที่เกี่ยวข้องกับ
-                                        <strong>"<?php echo e($query); ?>"</strong> ทั้งหมด <?php echo count($results); ?>
-                                        รายการ ดังนี้ครับ:
-                                    </p>
-                                    <ul style="margin-top: 1.5rem; display: grid; gap: 1rem;">
-                                        <?php foreach ($results as $res): ?>
-                                            <li
-                                                style="padding: 1rem; background: #f8fafc; border-radius: 1rem; border: 1px solid #f1f5f9;">
-                                                <div style="display: flex; justify-content: space-between; align-items: start;">
-                                                    <div>
-                                                        <span class="ai-badge" style="margin-bottom: 0.5rem; background: <?php
-                                                        if ($res['origin'] == 'expert')
-                                                            echo '#6366f1';
-                                                        elseif ($res['origin'] == 'training')
-                                                            echo '#f59e0b';
-                                                        elseif ($res['origin'] == 'guide')
-                                                            echo '#14b8a6';
-                                                        else
-                                                            echo 'var(--teal-primary)';
-                                                        ?>;">
-                                                            <?php
-                                                            if ($res['origin'] == 'expert')
-                                                                echo 'ผู้เชี่ยวชาญ';
-                                                            elseif ($res['origin'] == 'training')
-                                                                echo 'หลักสูตรอบรม';
-                                                            elseif ($res['origin'] == 'guide')
-                                                                echo 'คู่มือระบบ';
-                                                            else
-                                                                echo 'เอกสาร/ความรู้';
-                                                            ?>
-                                                        </span>
-                                                        <div style="font-weight: 700; color: #0f172a;">
-                                                            <?php echo e($res['title']); ?>
-                                                        </div>
-                                                        <p style="font-size: 0.875rem; color: #64748b; margin-top: 0.25rem;">
-                                                            <?php echo mb_strimwidth(strip_tags($res['body']), 0, 150, "..."); ?>
-                                                        </p>
-                                                    </div>
-                                                    <i data-lucide="chevron-right" style="color: #cbd5e1;"></i>
-                                                </div>
-                                            </li>
-                                        <?php endforeach; ?>
-                                    </ul>
-                                    <p
-                                        style="margin-top: 2rem; padding: 1rem; background: #f0fdf4; border-radius: 10px; border: 1px solid #dcfce7; color: #166534; font-size: 0.9rem;">
-                                        <strong>สรุปจาก AI:</strong> จากการสืบค้นข้อมูลในระบบ
-                                        พบว่าเนื้อหาที่คุณสนใจมีการรวบรวมไว้เป็นอย่างดี
-                                        ทั้งในรูปแบบเอกสารและหลักสูตรอบรมที่เกี่ยวข้อง
-                                        คุณสามารถเลือกศึกษาเพิ่มเติมจากรายการด้านบนได้ทันทีครับ
-                                    </p>
-                                <?php endif; ?>
+                            <div class="suggest-card" onclick="ask('มีเนื้อหายอดนิยมอะไรบ้าง')">
+                                <i data-lucide="zap" style="color: #6366f1; width: 22px;"></i>
+                                <span>มีเนื้อหายอดนิยมอะไรบ้าง</span>
+                            </div>
+                            <div class="suggest-card" onclick="ask('ใครคือผู้เชี่ยวชาญด้าน IT')">
+                                <i data-lucide="users" style="color: #10b981; width: 22px;"></i>
+                                <span>ใครคือผู้เชี่ยวชาญด้าน IT</span>
+                            </div>
+                            <div class="suggest-card" onclick="ask('มีอบรมอะไรใหม่บ้างสัปดาห์นี้')">
+                                <i data-lucide="book-open" style="color: #ec4899; width: 22px;"></i>
+                                <span>มีอบรมอะไรใหม่บ้างสัปดาห์นี้</span>
                             </div>
                         </div>
-
-                        <form action="ai_assistant.php" method="GET" style="margin-top: 2rem; position: relative;">
-                            <input type="text" name="q" class="search-input-lg" style="padding: 1rem 3rem; font-size: 1rem;"
-                                placeholder="ถามคำถามต่อเนื่องจากเดิม...">
-                            <button type="submit"
-                                style="position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--teal-primary); cursor: pointer;">
-                                <i data-lucide="send" style="width: 20px;"></i>
-                            </button>
-                        </form>
                     </div>
-                <?php endif; ?>
+                </div>
+            </div>
+
+            <div class="input-sticky">
+                <div class="input-bar">
+                    <button class="btn-circle"><i data-lucide="paperclip" style="width: 20px;"></i></button>
+                    <input type="text" id="chat-input" placeholder="Ask anything about UDRU..." autocomplete="off">
+                    <button class="btn-circle btn-send" id="send-trigger"><i data-lucide="send"
+                            style="width: 20px;"></i></button>
+                </div>
+                <div style="text-align: center; margin-top: 1rem; font-size: 0.7rem; color: #94a3b8; font-weight: 500;">
+                    Powered by UDRU KM Intelligence &bull; AI can make mistakes
+                </div>
             </div>
         </main>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         lucide.createIcons();
 
-        function setSearch(val) {
-            document.querySelector('.search-input-lg').value = val;
-            document.querySelector('.search-input-lg').focus();
+        const container = document.getElementById('message-container');
+        const input = document.getElementById('chat-input');
+        const btn = document.getElementById('send-trigger');
+        const welcome = document.getElementById('welcome-state');
+        const scroller = document.getElementById('chat-scroller');
+
+        function appendMessage(role, text) {
+            if (welcome) welcome.style.display = 'none';
+
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message m-${role}`;
+
+            const avatar = document.createElement('div');
+            avatar.className = `avatar a-${role}`;
+            avatar.innerHTML = role === 'bot' ? '<i data-lucide="bot" style="width:20px;"></i>' : '<i data-lucide="user" style="width:20px;"></i>';
+
+            const bubble = document.createElement('div');
+            bubble.className = `bubble b-${role}`;
+
+            if (role === 'user') {
+                bubble.textContent = text;
+            } else {
+                bubble.innerHTML = marked.parse(text);
+            }
+
+            msgDiv.appendChild(role === 'user' ? avatar : avatar); // avatar is same logic but CSS handles position
+            msgDiv.appendChild(bubble);
+
+            // Correct order for user message
+            if (role === 'user') {
+                msgDiv.innerHTML = '';
+                msgDiv.appendChild(bubble);
+                msgDiv.appendChild(avatar);
+            }
+
+            container.appendChild(msgDiv);
+            lucide.createIcons();
+            scroller.scrollTop = scroller.scrollHeight;
         }
 
-        let selectedFile = null;
+        async function ask(text) {
+            if (!text.trim()) return;
 
-        function handleFileSelect(event) {
-            const file = event.target.files[0];
-            if (file) {
-                selectedFile = file;
-                document.getElementById('selected-filename').textContent = file.name;
-                document.getElementById('file-preview-area').style.display = 'flex';
-                Swal.fire({
-                    toast: true,
-                    position: 'top-end',
-                    icon: 'success',
-                    title: 'เตรียมอัปโหลดไฟล์: ' + file.name,
-                    showConfirmButton: false,
-                    timer: 3000
-                });
+            const userText = text;
+            input.value = '';
+            appendMessage('user', userText);
+
+            // Show Typing
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message m-bot';
+            typingDiv.id = 'typing-temp';
+            typingDiv.innerHTML = `
+            <div class="avatar a-bot"><i data-lucide="bot" style="width:20px;"></i></div>
+            <div class="typing"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+        `;
+            container.appendChild(typingDiv);
+            scroller.scrollTop = scroller.scrollHeight;
+
+            try {
+                const formData = new FormData();
+                formData.append('ajax_chat', '1');
+                formData.append('message', userText);
+
+                const response = await fetch('ai_assistant.php', { method: 'POST', body: formData });
+                const data = await response.json();
+
+                document.getElementById('typing-temp').remove();
+                appendMessage('bot', data.response);
+            } catch (e) {
+                document.getElementById('typing-temp').remove();
+                appendMessage('bot', '❌ ขออภัยครับ ระบบการสนทนาขัดข้องชั่วคราว กรุณาลองใหม่อีกครั้ง');
             }
         }
 
-        function clearFile() {
-            selectedFile = null;
-            document.getElementById('ai-file-input').value = '';
-            document.getElementById('file-preview-area').style.display = 'none';
-        }
+        btn.addEventListener('click', () => ask(input.value));
+        input.addEventListener('keypress', (e) => { if (e.key === 'Enter') ask(input.value); });
 
-        function handleAISubmit() {
-            const query = document.getElementById('ai-query-input').value;
-
-            if (selectedFile) {
-                let analysisType = query.includes('สรุป') ? 'สรุปประเด็นสำคัญ' :
-                    (query.includes('ย่อ') ? 'ย่อเนื้อหา' : 'วิเคราะห์ข้อมูล');
-
-                Swal.fire({
-                    title: 'กำลังประมวลผลการวิเคราะห์...',
-                    html: `AI กำลัง <b>${analysisType}</b> จากไฟล์ <b>${selectedFile.name}</b><br>ตามคำสั่งของคุณ: "<i>${query || 'วิเคราะห์ทั่วไป'}</i>"`,
-                    allowOutsideClick: false,
-                    didOpen: () => { Swal.showLoading(); }
-                });
-
-                setTimeout(() => {
-                    Swal.close();
-                    let resultHtml = "";
-
-                    if (query.includes('สรุป') || query.includes('ย่อ')) {
-                        resultHtml = `
-                            <div style="background: #fdf2f8; padding: 1rem; border-radius: 12px; border: 1px solid #fbcfe8; margin-bottom: 1rem;">
-                                <h4 style="margin: 0; color: #be185d;">📄 บทสรุปย่อตามคำขอ</h4>
-                                <p style="margin: 0.5rem 0 0; color: #9d174d; font-size: 0.95rem;">
-                                    เอกสารชุดนี้สรุปได้ว่า เป็นการวางระเบียบวาระการพัฒนาทักษะดิจิทัลของบุคลากร 
-                                    โดยเน้นไปที่ 3 หัวข้อหลักคือ การใช้ AI ในงานธุรการ, ความปลอดภัยทางไซเบอร์, และการวิเคราะห์ข้อมูลเบื้องต้น
-                                </p>
-                            </div>
-                        `;
-                    }
-
-                    Swal.fire({
-                        title: 'ผลการวิเคราะห์เจาะลึก (AI)',
-                        width: '750px',
-                        html: `<div style="text-align: left; font-size: 0.95rem; line-height: 1.6;">
-                            ${resultHtml}
-                            <div style="background: #f8fafc; padding: 1rem; border-radius: 12px; border-left: 4px solid var(--teal-primary); margin-bottom: 1.5rem;">
-                                <h4 style="margin: 0; color: #0f172a;">ภาพรวมของเอกสาร</h4>
-                                <p style="margin: 0.5rem 0 0; color: #475569; font-size: 0.9rem;">เป้าหมายหลักของไฟล์คือการเพิ่มประสิทธิภาพการทำงานผ่านกระบวนการจัดการความรู้ (KM) เพื่อรองรับมาตรฐาน EdPEx</p>
-                            </div>
-
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
-                                <div style="padding: 1rem; border: 1px solid #e2e8f0; border-radius: 12px;">
-                                    <div style="font-weight: 700; color: #166534; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
-                                        <i data-lucide="check-circle-2" style="width:16px;"></i> ข้อดีที่พบ
-                                    </div>
-                                    <ul style="padding-left: 1.25rem; font-size: 0.85rem; color: #475569; margin: 0;">
-                                        <li>มีแผนผังกระบวนการ (Workflow) ชัดเจน</li>
-                                        <li>อ้างอิงแหล่งกฎหมายที่เกี่ยวข้องครบถ้วน</li>
-                                    </ul>
-                                </div>
-                                <div style="padding: 1rem; border: 1px solid #e2e8f0; border-radius: 12px;">
-                                    <div style="font-weight: 700; color: #991b1b; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
-                                        <i data-lucide="alert-triangle" style="width:16px;"></i> จุดที่ต้องตรวจสอบเพิ่ม
-                                    </div>
-                                    <ul style="padding-left: 1.25rem; font-size: 0.85rem; color: #475569; margin: 0;">
-                                        <li>วิธีการวัดผลลัพธ์ยังไม่เป็นรูปธรรม</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>`,
-                        icon: 'success',
-                        confirmButtonText: 'บันทึกบทสรุปนี้',
-                        didOpen: () => { lucide.createIcons(); }
-                    });
-                    clearFile();
-                }, 3000);
-            } else if (query) {
-                // Regular Text Search
-                window.location.href = 'ai_assistant.php?q=' + encodeURIComponent(query);
-            }
-        }
-
-        document.getElementById('ai-query-input').addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                handleAISubmit();
-            }
-        });
+        window.onload = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const q = urlParams.get('q');
+            if (q) ask(q);
+        };
     </script>
+
 </body>
 
 </html>

@@ -148,7 +148,7 @@ if (isset($_GET['status']) && $_GET['status'] == 'created') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $id > 0 ? 'แก้ไขหลักสูตร' : 'สร้างหลักสูตรใหม่'; ?> | KM Portal</title>
+    <title><?php echo $id > 0 ? 'แก้ไขหลักสูตร' : 'สร้างหลักสูตรใหม่'; ?> | UDRU Wisdom</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"

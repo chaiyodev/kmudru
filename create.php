@@ -10,7 +10,7 @@ $pdo = get_pdo();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>สร้างสรรค์ผลงานใหม่ | KM Portal</title>
+    <title>สร้างสรรค์ผลงานใหม่ | UDRU Wisdom</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
@@ -75,7 +75,7 @@ $pdo = get_pdo();
             <div class="sidebar-brand">
                 <div class="brand-icon"><i data-lucide="book-open"></i></div>
                 <div class="brand-info">
-                    <h1>KM Portal</h1><span>UDRU HUB</span>
+                    <h1>UDRU Wisdom</h1><span>UDRU HUB</span>
                 </div>
             </div>
             <nav class="nav-group">

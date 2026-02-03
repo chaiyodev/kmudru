@@ -161,7 +161,7 @@ if ($tab === 'discussions') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>
-        <?php echo e($cop['name']); ?> | KM Portal
+        <?php echo e($cop['name']); ?> | UDRU Wisdom
     </title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link
@@ -489,7 +489,7 @@ if ($tab === 'discussions') {
                                     function showAuthAlert() {
                                         Swal.fire({
                                             title: 'กรุณาเข้าสู่ระบบ',
-                                            text: 'คุณต้องเป็นสมาชิกของ KM Portal ก่อนจึงจะเข้าร่วมกลุ่ม CoP ได้ครับ',
+                                            text: 'คุณต้องเป็นสมาชิกของ UDRU Wisdom ก่อนจึงจะเข้าร่วมกลุ่ม CoP ได้ครับ',
                                             icon: 'info',
                                             showCancelButton: true,
                                             confirmButtonText: 'ไปหน้าสมัครสมาชิก',

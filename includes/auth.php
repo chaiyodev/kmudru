@@ -2,6 +2,7 @@
 session_start();
 require_once __DIR__ . '/security.php';
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/logger.php';
 
 function login($username, $password)
 {
@@ -28,6 +29,7 @@ function login($username, $password)
         $_SESSION['full_name'] = $user['full_name'];
         $_SESSION['role'] = $user['role'];
         unset($_SESSION['login_attempts']);
+        log_activity('login');
         return true;
     }
 

@@ -5,6 +5,7 @@ require_once 'includes/auth.php';
 $pdo = get_pdo();
 $search = isset($_GET['search']) ? $_GET['search'] : '';
 $type = isset($_GET['type']) ? $_GET['type'] : '';
+$cat_id = isset($_GET['cat_id']) ? (int) $_GET['cat_id'] : 0;
 $docs = [];
 $stats = ['document' => 0, 'wiki' => 0, 'qa' => 0, 'total' => 0];
 
@@ -36,6 +37,11 @@ if ($pdo) {
         $params[] = $type;
     }
 
+    if ($cat_id > 0) {
+        $query .= " AND d.category_id = ?";
+        $params[] = $cat_id;
+    }
+
     $query .= " ORDER BY d.created_at DESC";
     $stmt = $pdo->prepare($query);
     $stmt->execute($params);
@@ -50,7 +56,7 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>คลังความรู้ | KM Portal</title>
+    <title>คลังความรู้ | UDRU Wisdom</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"

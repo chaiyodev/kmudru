@@ -30,6 +30,11 @@ if ($pdo) {
         $stmt = $pdo->prepare("SELECT COUNT(*) FROM document_likes dl JOIN documents d ON dl.document_id = d.id WHERE d.user_id = ?");
         $stmt->execute([$user_id]);
         $stats['likes'] = $stmt->fetchColumn();
+
+        // Fetch Certificates
+        $stmt = $pdo->prepare("SELECT c.*, t.title as course_title FROM certificates c JOIN trainings t ON c.course_id = t.id WHERE c.user_id = ? ORDER BY c.issued_at DESC");
+        $stmt->execute([$user_id]);
+        $certificates = $stmt->fetchAll();
     } catch (PDOException $e) {
     }
 }
@@ -47,7 +52,7 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>โปรไฟล์ของฉัน | KM Portal</title>
+    <title>โปรไฟล์ของฉัน | UDRU Wisdom</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
@@ -142,11 +147,14 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                 <div class="profile-card">
                     <div class="profile-avatar"><?php echo strtoupper(substr($user_info['username'], 0, 2)); ?></div>
                     <h3 style="font-size: 1.5rem; font-weight: 800; margin-bottom: 0.25rem;">
-                        <?php echo htmlspecialchars($user_info['full_name']); ?></h3>
+                        <?php echo htmlspecialchars($user_info['full_name']); ?>
+                    </h3>
                     <p style="color: hsl(var(--muted-foreground)); font-size: 0.9375rem; margin-bottom: 0.5rem;">
-                        <?php echo htmlspecialchars($user_info['specialty'] ?? 'ผู้ใช้งานทั่วไป'); ?></p>
+                        <?php echo htmlspecialchars($user_info['specialty'] ?? 'ผู้ใช้งานทั่วไป'); ?>
+                    </p>
                     <p style="color: hsl(var(--muted-foreground)); font-size: 0.8125rem;">
-                        <?php echo htmlspecialchars($user_info['department'] ?? 'ยังไม่ระบุหน่วยงาน'); ?></p>
+                        <?php echo htmlspecialchars($user_info['department'] ?? 'ยังไม่ระบุหน่วยงาน'); ?>
+                    </p>
 
                     <div class="xp-card">
                         <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
@@ -230,6 +238,40 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                                                     data-lucide="edit-2" style="width: 12px; height: 12px;"></i>แก้ไข</a>
                                         </div>
                                     </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <!-- Certificates Section -->
+                    <div style="margin-top: 3rem; margin-bottom: 1.5rem;">
+                        <h3 style="font-size: 1.125rem; font-weight: 800;">ใบประกาศนียบัตรของฉัน
+                            (<?php echo count($certificates); ?>)</h3>
+                    </div>
+
+                    <?php if (empty($certificates)): ?>
+                        <div
+                            style="background: white; border-radius: 1rem; border: 1px solid var(--border-color); padding: 2rem; text-align: center; color: hsl(var(--muted-foreground));">
+                            คุณยังไม่มีใบประกาศนียบัตร เรียนหลักสูตรและสอบให้ผ่านเพื่อรับใบประกาศ!
+                        </div>
+                    <?php else: ?>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <?php foreach ($certificates as $cert): ?>
+                                <div
+                                    style="background: white; border-radius: 1rem; border: 1px solid var(--border-color); padding: 1.5rem; display: flex; align-items: center; gap: 1rem;">
+                                    <div
+                                        style="width: 48px; height: 48px; background: hsl(45 93% 47% / 0.1); color: hsl(45 93% 47%); border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                        <i data-lucide="award"></i>
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: 700; font-size: 0.875rem;">
+                                            <?php echo htmlspecialchars($cert['course_title']); ?>
+                                        </div>
+                                        <div style="font-size: 0.75rem; color: hsl(var(--muted-foreground)); margin-top: 2px;">
+                                            รหัส: <?php echo $cert['certificate_code']; ?></div>
+                                    </div>
+                                    <a href="certificate.php?id=<?php echo $cert['id']; ?>" class="btn-sm"
+                                        style="padding: 0.25rem 0.5rem; text-decoration: none; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.75rem;">ดูไฟล์</a>
                                 </div>
                             <?php endforeach; ?>
                         </div>

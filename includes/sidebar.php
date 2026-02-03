@@ -2,9 +2,14 @@
 // includes/sidebar.php
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/logger.php';
+
 $sidebar_pdo = get_pdo();
 $doc_count = $sidebar_pdo->query("SELECT COUNT(*) FROM documents")->fetchColumn();
 $current_page = basename($_SERVER['PHP_SELF']);
+
+// Track page visit for analytics
+track_visitor($current_page);
 ?>
 <aside class="sidebar" id="main-sidebar">
     <div class="sidebar-brand">
@@ -180,4 +185,169 @@ $current_page = basename($_SERVER['PHP_SELF']);
             lucide.createIcons();
         }
     });
+
+    function aiAssistant(mode) {
+        if (mode === 'chat') {
+            const drawer = document.getElementById('ai-chat-drawer');
+            drawer.classList.add('open');
+        }
+    }
+
+    function closeAIDrawer() {
+        document.getElementById('ai-chat-drawer').classList.remove('open');
+    }
+</script>
+
+<!-- AI Chat Drawer -->
+<div id="ai-chat-drawer" class="ai-drawer">
+    <div class="ai-drawer-header">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div class="ai-avatar-m"><i data-lucide="bot"></i></div>
+            <div>
+                <div style="font-weight: 700; font-size: 1rem;">UDRU AI Chatbot</div>
+                <div style="font-size: 0.75rem; color: #10b981;">● Online</div>
+            </div>
+        </div>
+        <button onclick="closeAIDrawer()" style="background:none; border:none; color: white; cursor:pointer;">
+            <i data-lucide="x"></i>
+        </button>
+    </div>
+    <div class="ai-drawer-body" id="ai-chat-messages">
+        <div class="ai-msg ai-msg-bot">สวัสดีครับ! ผมเป็นผู้ช่วยอัจฉริยะ UDRU วันนี้มีอะไรให้ผมช่วยสืบค้น
+            หรือสงสัยเรื่องไหนสอบถามได้ทันทีครับ</div>
+    </div>
+    <div class="ai-drawer-footer">
+        <form onsubmit="sendDrawerMessage(event)">
+            <input type="text" id="ai-drawer-input" placeholder="พิมพ์คำถามของคุณ..." autocomplete="off">
+            <button type="submit"><i data-lucide="send"></i></button>
+        </form>
+    </div>
+</div>
+
+<style>
+    .ai-drawer {
+        position: fixed;
+        right: -400px;
+        top: 0;
+        width: 380px;
+        height: 100vh;
+        background: white;
+        box-shadow: -5px 0 25px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
+        transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .ai-drawer.open {
+        right: 0;
+    }
+
+    .ai-drawer-header {
+        padding: 1.5rem;
+        background: linear-gradient(135deg, var(--teal-primary) 0%, #0ea5e9 100%);
+        color: white;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .ai-avatar-m {
+        width: 40px;
+        height: 40px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .ai-drawer-body {
+        flex: 1;
+        padding: 1.5rem;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        background: #f8fafc;
+    }
+
+    .ai-msg {
+        max-width: 85%;
+        padding: 0.75rem 1rem;
+        border-radius: 1rem;
+        font-size: 0.875rem;
+        line-height: 1.5;
+    }
+
+    .ai-msg-bot {
+        background: white;
+        color: #1e293b;
+        align-self: flex-start;
+        border-bottom-left-radius: 0.25rem;
+        border: 1px solid #e2e8f0;
+    }
+
+    .ai-msg-user {
+        background: var(--teal-primary);
+        color: white;
+        align-self: flex-end;
+        border-bottom-right-radius: 0.25rem;
+    }
+
+    .ai-drawer-footer {
+        padding: 1rem;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .ai-drawer-footer form {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .ai-drawer-footer input {
+        flex: 1;
+        padding: 0.75rem 1rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 100px;
+        outline: none;
+    }
+
+    .ai-drawer-footer button {
+        width: 44px;
+        height: 44px;
+        background: var(--teal-primary);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+    }
+</style>
+
+<script>
+    function sendDrawerMessage(e) {
+        e.preventDefault();
+        const input = document.getElementById('ai-drawer-input');
+        const text = input.value.trim();
+        if (!text) return;
+
+        const body = document.getElementById('ai-chat-messages');
+
+        // Add User Message
+        const userDiv = document.createElement('div');
+        userDiv.className = 'ai-msg ai-msg-user';
+        userDiv.textContent = text;
+        body.appendChild(userDiv);
+
+        input.value = '';
+        body.scrollTop = body.scrollHeight;
+
+        // Redirect to full AI Assistant after a small delay to feel like a "handoff"
+        setTimeout(() => {
+            window.location.href = 'ai_assistant.php?q=' + encodeURIComponent(text);
+        }, 1000);
+    }
 </script>

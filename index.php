@@ -39,17 +39,23 @@ if ($pdo) {
         $latest_docs = $stmt->fetchAll();
 
         // Fetch trending topics
-        $stmt = $pdo->query("SELECT c.name, COUNT(d.id) as doc_count FROM categories c LEFT JOIN documents d ON c.id = d.category_id GROUP BY c.id ORDER BY doc_count DESC LIMIT 8");
+        $stmt = $pdo->query("SELECT c.id, c.name, COUNT(d.id) as doc_count FROM categories c LEFT JOIN documents d ON c.id = d.category_id GROUP BY c.id ORDER BY doc_count DESC LIMIT 8");
         $trending_topics = $stmt->fetchAll();
 
-        // Activity Feed
+        // Activity Feed (More comprehensive)
         $activity_query = "
             (SELECT 'document' as type, title as content, created_at, u.username, u.full_name 
              FROM documents d JOIN users u ON d.user_id = u.id)
             UNION
             (SELECT 'comment' as type, comment as content, created_at, u.username, u.full_name 
              FROM comments c JOIN users u ON c.user_id = u.id)
-            ORDER BY created_at DESC LIMIT 5";
+            UNION
+            (SELECT 'training' as type, title as content, created_at, 'System' as username, 'Admin' as full_name 
+             FROM trainings)
+            UNION
+            (SELECT 'community' as type, name as content, created_at, 'System' as username, 'Admin' as full_name 
+             FROM communities)
+            ORDER BY created_at DESC LIMIT 10";
         $recent_activity = $pdo->query($activity_query)->fetchAll();
 
     } catch (PDOException $e) {
@@ -64,7 +70,7 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KM Portal | UDRU Knowledge Hub</title>
+    <title>UDRU Wisdom | UDRU Knowledge Hub</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
@@ -84,7 +90,7 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                     <?php if ($user): ?>
                         <h2>ยินดีต้อนรับ, <?php echo htmlspecialchars(explode(' ', $user['full_name'])[0]); ?> 👋</h2>
                     <?php else: ?>
-                        <h2>ยินดีต้อนรับสู่ KM Portal 👋</h2>
+                        <h2>ยินดีต้อนรับสู่ UDRU Wisdom 👋</h2>
                     <?php endif; ?>
                     <p>สืบค้นและแบ่งปันองค์ความรู้เพื่อสังคมแห่งการเรียนรู้ UDRU</p>
                 </div>
@@ -193,13 +199,18 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
 
                 <aside>
                     <!-- AI Smart Hub Widget -->
-                    <div style="background: linear-gradient(135deg, #14b8a6 0%, #0ea5e9 100%); padding: 1.5rem; border-radius: 1rem; color: white; margin-bottom: 2rem; position: relative; overflow: hidden; box-shadow: 0 10px 25px rgba(20, 184, 166, 0.3);">
-                        <i data-lucide="sparkles" style="position: absolute; right: -10px; top: -10px; width: 60px; height: 60px; opacity: 0.2;"></i>
-                        <h4 style="font-size: 1rem; font-weight: 800; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <div
+                        style="background: linear-gradient(135deg, #14b8a6 0%, #0ea5e9 100%); padding: 1.5rem; border-radius: 1rem; color: white; margin-bottom: 2rem; position: relative; overflow: hidden; box-shadow: 0 10px 25px rgba(20, 184, 166, 0.3);">
+                        <i data-lucide="sparkles"
+                            style="position: absolute; right: -10px; top: -10px; width: 60px; height: 60px; opacity: 0.2;"></i>
+                        <h4
+                            style="font-size: 1rem; font-weight: 800; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
                             <i data-lucide="bot" style="width: 18px;"></i> AI Smart Insight
                         </h4>
-                        <p style="font-size: 0.8rem; opacity: 0.9; line-height: 1.5;">วันนี้มีเอกสาร 5 รายการใหม่ที่ตรงกับทักษะ "ประกันคุณภาพ" ของคุณครับ</p>
-                        <a href="ai_assistant.php" style="display: block; width: 100%; padding: 0.65rem; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 10px; color: white; text-align: center; text-decoration: none; margin-top: 1rem; font-size: 0.8125rem; font-weight: 700;">ดูข้อมูลเจาะลึก</a>
+                        <p style="font-size: 0.8rem; opacity: 0.9; line-height: 1.5;">วันนี้มีเอกสาร 5
+                            รายการใหม่ที่ตรงกับทักษะ "ประกันคุณภาพ" ของคุณครับ</p>
+                        <a href="ai_assistant.php"
+                            style="display: block; width: 100%; padding: 0.65rem; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 10px; color: white; text-align: center; text-decoration: none; margin-top: 1rem; font-size: 0.8125rem; font-weight: 700;">ดูข้อมูลเจาะลึก</a>
                     </div>
 
                     <div
@@ -207,7 +218,7 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                         <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 1.5rem;">หัวข้อยอดนิยม</h3>
                         <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
                             <?php foreach ($trending_topics as $topic): ?>
-                                <a href="browse.php?search=<?php echo urlencode($topic['name']); ?>" class="tag-badge"
+                                <a href="browse.php?cat_id=<?php echo $topic['id']; ?>" class="tag-badge"
                                     style="text-decoration: none; padding: 6px 12px; font-size: 0.8125rem;">
                                     <?php echo htmlspecialchars($topic['name']); ?>
                                     <span
@@ -227,17 +238,28 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                                         style="width: 32px; height: 32px; background: hsl(var(--muted)); border-radius: 50%; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700;">
                                         <?php echo strtoupper(substr($act['username'], 0, 1)); ?>
                                     </div>
-                                    <div>
+                                    <div style="flex: 1;">
                                         <p style="font-size: 0.8125rem; font-weight: 600;">
                                             <?php echo htmlspecialchars($act['full_name']); ?>
                                             <span style="font-weight: 400; color: hsl(var(--muted-foreground));">
-                                                <?php echo $act['type'] == 'document' ? 'สร้างบทความใหม่' : 'แสดงความคิดเห็น'; ?>
+                                                <?php
+                                                if ($act['type'] == 'document')
+                                                    echo 'สร้างบทความใหม่';
+                                                elseif ($act['type'] == 'comment')
+                                                    echo 'แสดงความคิดเห็น';
+                                                elseif ($act['type'] == 'training')
+                                                    echo 'เพิ่มหลักสูตรอบรมใหม่';
+                                                elseif ($act['type'] == 'community')
+                                                    echo 'สร้างชุมชน CoP ใหม่';
+                                                ?>
                                             </span>
                                         </p>
                                         <p
                                             style="font-size: 0.75rem; color: var(--teal-primary); font-weight: 500; margin-top: 2px;">
                                             <?php echo mb_strimwidth($act['content'], 0, 40, "..."); ?>
                                         </p>
+                                        <span
+                                            style="font-size: 0.65rem; color: #94a3b8;"><?php echo date('d/m/Y H:i', strtotime($act['created_at'])); ?></span>
                                     </div>
                                 </div>
                             <?php endforeach; ?>

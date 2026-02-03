@@ -1,18 +1,15 @@
-# Database credentials
+# Database configuration
 includes/db.php
+includes/config.php
 
-# Operating System Files
+# PHP safe temp files
+*.tmp
+*.log
+
+# Uploaded content
+uploads/*
+!uploads/.gitkeep
+
+# OS files
 .DS_Store
 Thumbs.db
-desktop.ini
-
-# IDE Files
-.vscode/
-.idea/
-*.sublime-project
-*.sublime-workspace
-
-# Temporary Files
-tmp/
-*.log
-*.tmp

@@ -1,9 +1,9 @@
 @echo off
-title KM Portal - Git Setup & Push
+title UDRU Wisdom - Git Setup & Push
 color 0A
 
 echo ===================================================
-echo      KM Portal - Automatic Git Setup Tool
+echo      UDRU Wisdom - Automatic Git Setup Tool
 echo ===================================================
 echo.
 
@@ -34,7 +34,7 @@ git add .
 :: 4. Commit
 echo.
 echo [3/5] Committing files...
-git commit -m "Complete KM Portal System (Phase 1-5)"
+git commit -m "Complete UDRU Wisdom System (Phase 1-5)"
 
 :: 5. Branch
 git branch -M main

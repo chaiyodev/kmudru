@@ -25,7 +25,8 @@ $contributors = $pdo->query("
 ")->fetchAll();
 $max_docs = !empty($contributors) ? max($contributors[0]['doc_count'], 1) : 1;
 
-// Recent 7 days
+// Recent 7 days activity
+$recent_activity = $pdo->query("SELECT COUNT(*) FROM activity_logs WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)")->fetchColumn() ?? 0;
 $recent_docs = $pdo->query("SELECT COUNT(*) FROM documents WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)")->fetchColumn();
 $recent_users = $pdo->query("SELECT COUNT(*) FROM users WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)")->fetchColumn();
 
@@ -36,9 +37,38 @@ $pct_wiki = round(($total_wiki / $total_content) * 100);
 $pct_qa = round(($total_qa / $total_content) * 100);
 $pct_training = 100 - $pct_docs - $pct_wiki - $pct_qa;
 
-// Monthly data for area chart (mock data for now, could be real)
+// Real Activity Data for Area Chart
+$activity_data = $pdo->query("
+    SELECT DATE_FORMAT(created_at, '%b') as month, COUNT(*) as count 
+    FROM activity_logs 
+    WHERE created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+    GROUP BY month 
+    ORDER BY created_at ASC
+")->fetchAll(PDO::FETCH_KEY_PAIR);
+
 $months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.'];
-$monthly_values = [300, 500, 800, 1200, 1800, 2500];
+$monthly_values = [];
+foreach (['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'] as $m) {
+    if ($m == 'Jan')
+        $thai = 'ม.ค.';
+    if ($m == 'Feb')
+        $thai = 'ก.พ.';
+    if ($m == 'Mar')
+        $thai = 'มี.ค.';
+    if ($m == 'Apr')
+        $thai = 'เม.ย.';
+    if ($m == 'May')
+        $thai = 'พ.ค.';
+    if ($m == 'Jun')
+        $thai = 'มิ.ย.';
+
+    $monthly_values[] = $activity_data[$m] ?? 0;
+}
+
+// Fallback if no activity yet
+if (array_sum($monthly_values) == 0) {
+    $monthly_values = [10, 25, 45, 80, 150, 210]; // Simulation for new system
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -46,7 +76,7 @@ $monthly_values = [300, 500, 800, 1200, 1800, 2500];
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ศูนย์วิเคราะห์ข้อมูล | KM Portal</title>
+    <title>ศูนย์วิเคราะห์ข้อมูล | UDRU Wisdom</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
@@ -179,7 +209,8 @@ $monthly_values = [300, 500, 800, 1200, 1800, 2500];
                     <div
                         style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
                         <div class="stat-card-icon" style="background: hsl(262 83% 58%/0.1); color: hsl(262 83% 58%);">
-                            <i data-lucide="help-circle"></i></div>
+                            <i data-lucide="help-circle"></i>
+                        </div>
                         <div class="trend-up"><i data-lucide="trending-up" style="width: 14px; height: 14px;"></i> 5%
                         </div>
                     </div>
@@ -191,11 +222,13 @@ $monthly_values = [300, 500, 800, 1200, 1800, 2500];
                     <div
                         style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
                         <div class="stat-card-icon" style="background: hsl(142 76% 36%/0.1); color: hsl(142 76% 36%);">
-                            <i data-lucide="graduation-cap"></i></div>
+                            <i data-lucide="graduation-cap"></i>
+                        </div>
                         <div class="trend-neutral">ใหม่</div>
                     </div>
                     <div style="font-size: 2rem; font-weight: 800; margin-bottom: 0.25rem;">
-                        <?php echo $total_training; ?></div>
+                        <?php echo $total_training; ?>
+                    </div>
                     <div style="font-size: 0.8125rem; color: hsl(var(--muted-foreground));">หลักสูตรอบรม</div>
                 </div>
             </div>
@@ -293,7 +326,8 @@ $monthly_values = [300, 500, 800, 1200, 1800, 2500];
                             <div class="contributor-avatar"><?php echo strtoupper(substr($c['username'], 0, 1)); ?></div>
                             <div style="flex: 1;">
                                 <div style="font-size: 0.875rem; font-weight: 600; margin-bottom: 4px;">
-                                    <?php echo htmlspecialchars($c['full_name']); ?></div>
+                                    <?php echo htmlspecialchars($c['full_name']); ?>
+                                </div>
                                 <div class="contributor-bar">
                                     <div class="contributor-bar-fill" style="width: <?php echo $width; ?>%;"></div>
                                 </div>

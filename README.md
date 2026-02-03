@@ -1,4 +1,4 @@
-# KM Portal - Knowledge Management System
+# UDRU Wisdom - Knowledge Management System
 
 ระบบจัดการความรู้ (Knowledge Management) สำหรับมหาวิทยาลัยราชภัฏอุดรธานี (UDRU) ที่เน้นความสวยงาม ทันสมัย และการใช้งานที่ลื่นไหล
 
