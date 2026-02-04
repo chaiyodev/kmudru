@@ -70,21 +70,7 @@ $pdo = get_pdo();
 
 <body>
     <div class="app-container">
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="sidebar-brand">
-                <div class="brand-icon"><i data-lucide="book-open"></i></div>
-                <div class="brand-info">
-                    <h1>UDRU Wisdom</h1><span>UDRU HUB</span>
-                </div>
-            </div>
-            <nav class="nav-group">
-                <div class="nav-label">เมนูหลัก</div>
-                <a href="index.php" class="nav-link"><i data-lucide="layout"></i>หน้าหลัก</a>
-                <a href="create.php" class="nav-link active"><i data-lucide="plus-circle"></i>สร้างใหม่</a>
-            </nav>
-        </aside>
-
+        <?php include 'includes/sidebar.php'; ?>
         <!-- Main Viewport -->
         <main class="main-viewport">
             <header class="header-top">

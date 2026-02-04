@@ -96,7 +96,8 @@ if (isset($_POST['ajax_chat'])) {
             $clean_query = str_replace(["?", "!", "ค่ะ", "ครับ", "ช่วย", "หน่อย", "คือ", "หา"], "", $msg);
             $keywords = explode(' ', $clean_query);
             $keywords = array_filter($keywords, function ($v) {
-                return mb_strlen($v) > 1; });
+                return mb_strlen($v) > 1;
+            });
             if (empty($keywords))
                 $keywords = [$clean_query];
 
@@ -154,7 +155,7 @@ if (isset($_POST['ajax_chat'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UDRU AI Workspace</title>
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
     <link
         href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
@@ -178,81 +179,32 @@ if (isset($_POST['ajax_chat'])) {
             padding: 0;
             min-height: 100vh;
             width: 100%;
-            background: var(--chat-bg);
+            background-color: var(--chat-bg);
             font-family: 'Plus Jakarta Sans', 'Sarabun', sans-serif;
             overflow: hidden;
         }
 
-        .workspace-container {
-            display: grid;
-            grid-template-columns: var(--sidebar-w) 1fr;
+        .app-container {
+            display: flex;
             height: 100vh;
             width: 100%;
         }
 
-        /* --- Sidebar UI --- */
-        .workspace-sidebar {
-            background: #ffffff;
-            border-right: 1px solid #e2e8f0;
-            display: flex;
-            flex-direction: column;
-            padding: 1.5rem;
-            z-index: 50;
+        .main-viewport {
+            flex-grow: 1;
+            height: 100vh;
+            overflow: hidden;
+            transition: margin-left 0.3s ease, width 0.3s ease;
         }
 
-        .sidebar-logo {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 2rem;
+        body.sidebar-collapsed .main-viewport {
+            margin-left: var(--sidebar-collapsed-width);
+            width: calc(100% - var(--sidebar-collapsed-width));
         }
 
-        .logo-box {
-            width: 40px;
-            height: 40px;
-            border-radius: 12px;
-            background: linear-gradient(135deg, var(--accent), #0ea5e9);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            box-shadow: 0 4px 12px var(--accent-glow);
-        }
+        /* Use global sidebar logo and header styles */
 
-        .nav-group {
-            margin-bottom: 2rem;
-        }
-
-        .nav-label {
-            font-size: 0.7rem;
-            font-weight: 700;
-            color: #94a3b8;
-            text-transform: uppercase;
-            margin-bottom: 0.75rem;
-        }
-
-        .nav-item {
-            padding: 0.75rem 1rem;
-            border-radius: 10px;
-            color: #475569;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            font-size: 0.9rem;
-            font-weight: 600;
-            transition: 0.2s;
-        }
-
-        .nav-item:hover {
-            background: #f1f5f9;
-            color: #0f172a;
-        }
-
-        .nav-item.active {
-            background: #f0fdfa;
-            color: var(--accent);
-        }
+        /* Removed local nav overrides to use global sidebar styles */
 
         /* --- Main Chat UI --- */
         .chat-area {
@@ -528,95 +480,55 @@ if (isset($_POST['ajax_chat'])) {
 
 <body>
 
-    <div class="workspace-container">
-        <aside class="workspace-sidebar">
-            <div class="sidebar-logo">
-                <div class="logo-box"><i data-lucide="bot"></i></div>
-                <div style="font-weight: 800; font-size: 1.2rem; display: flex; flex-direction: column;">
-                    UDRU AI
-                    <span
-                        style="font-size: 0.6rem; color: #94a3b8; font-weight: 800; text-transform: uppercase;">Workspace
-                        v2.0</span>
+    <div class="app-container">
+        <?php include 'includes/sidebar.php'; ?>
+
+        <main class="main-viewport" style="display: flex; flex-direction: column; height: 100vh; padding: 0;">
+            <div class="chat-area" id="chat-scroller" style="flex: 1; overflow-y: auto;">
+                <div class="chat-messages">
+                    <div class="messages-inner" id="message-container">
+                        <div class="hero" id="welcome-state">
+                            <div
+                                style="width: 70px; height: 70px; background: white; border-radius: 20px; display: flex; align-items: center; justify-content: center; color: var(--accent); margin: 0 auto 1.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.05);">
+                                <i data-lucide="sparkles" style="width: 36px; height: 36px;"></i>
+                            </div>
+                            <h2>สวัสดีครับ! มีอะไรให้ผมช่วยสืบค้นไหมครับ?</h2>
+                            <p>ผมคือผู้ช่วยอัจฉริยะ UDRU Wisdom ท่านสามารถสอบถามข้อมูลเอกสาร ผู้เชี่ยวชาญ
+                                หรือคอร์สเรียนได้ทันที</p>
+
+                            <div class="suggest-grid">
+                                <div class="suggest-card" onclick="ask('สรุปผลกิจกรรมล่าสุดในระบบ')">
+                                    <i data-lucide="trending-up" style="color: #f59e0b; width: 22px;"></i>
+                                    <span>สรุปผลกิจกรรมล่าสุดในระบบ</span>
+                                </div>
+                                <div class="suggest-card" onclick="ask('มีเนื้อหายอดนิยมอะไรบ้าง')">
+                                    <i data-lucide="zap" style="color: #6366f1; width: 22px;"></i>
+                                    <span>มีเนื้อหายอดนิยมอะไรบ้าง</span>
+                                </div>
+                                <div class="suggest-card" onclick="ask('ใครคือผู้เชี่ยวชาญด้าน IT')">
+                                    <i data-lucide="users" style="color: #10b981; width: 22px;"></i>
+                                    <span>ใครคือผู้เชี่ยวชาญด้าน IT</span>
+                                </div>
+                                <div class="suggest-card" onclick="ask('มีอบรมอะไรใหม่บ้างสัปดาห์นี้')">
+                                    <i data-lucide="book-open" style="color: #ec4899; width: 22px;"></i>
+                                    <span>มีอบรมอะไรใหม่บ้างสัปดาห์นี้</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            <div class="nav-group">
-                <div class="nav-label">General</div>
-                <a href="javascript:void(0)" onclick="location.reload()" class="nav-item active">
-                    <i data-lucide="message-square" style="width: 18px;"></i> New Conversation
-                </a>
-                <a href="index.php" class="nav-item">
-                    <i data-lucide="home" style="width: 18px;"></i> Homepage
-                </a>
-            </div>
-
-            <div class="nav-group" style="flex: 1;">
-                <div class="nav-label">Historical Activity</div>
-                <div
-                    style="text-align: center; color: #cbd5e1; font-size: 0.8rem; padding: 2rem 0; font-style: italic;">
-                    History is cleared on reload
-                </div>
-            </div>
-
-            <div class="sidebar-footer" style="padding-top: 1rem; border-top: 1px solid #f1f5f9;">
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <div class="input-sticky">
+                    <div class="input-bar">
+                        <button class="btn-circle"><i data-lucide="paperclip" style="width: 20px;"></i></button>
+                        <input type="text" id="chat-input" placeholder="Ask anything about UDRU..." autocomplete="off">
+                        <button class="btn-circle btn-send" id="send-trigger"><i data-lucide="send"
+                                style="width: 20px;"></i></button>
+                    </div>
                     <div
-                        style="width: 32px; height: 32px; border-radius: 8px; background: #0f172a; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.8rem;">
-                        <?php echo isset($user['username']) ? strtoupper(substr($user['username'], 0, 2)) : 'G'; ?>
+                        style="text-align: center; margin-top: 1rem; font-size: 0.7rem; color: #94a3b8; font-weight: 500;">
+                        Powered by UDRU KM Intelligence &bull; AI can make mistakes
                     </div>
-                    <div style="overflow: hidden;">
-                        <div
-                            style="font-weight: 700; font-size: 0.85rem; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                            <?php echo isset($user['full_name']) ? e($user['full_name']) : 'Guest User'; ?>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </aside>
-
-        <main class="chat-area">
-            <div class="chat-messages" id="chat-scroller">
-                <div class="messages-inner" id="message-container">
-                    <div class="hero" id="welcome-state">
-                        <div
-                            style="width: 70px; height: 70px; background: white; border-radius: 20px; display: flex; align-items: center; justify-content: center; color: var(--accent); margin: 0 auto 1.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.05);">
-                            <i data-lucide="sparkles" style="width: 36px; height: 36px;"></i>
-                        </div>
-                        <h2>How can I assist you?</h2>
-                        <p>I'm your UDRU Wisdom Assistant. Search for documents, experts, or training courses with
-                            natural language.</p>
-
-                        <div class="suggest-grid">
-                            <div class="suggest-card" onclick="ask('สรุปผลกิจกรรมล่าสุดในระบบ')">
-                                <i data-lucide="trending-up" style="color: #f59e0b; width: 22px;"></i>
-                                <span>สรุปผลกิจกรรมล่าสุดในระบบ</span>
-                            </div>
-                            <div class="suggest-card" onclick="ask('มีเนื้อหายอดนิยมอะไรบ้าง')">
-                                <i data-lucide="zap" style="color: #6366f1; width: 22px;"></i>
-                                <span>มีเนื้อหายอดนิยมอะไรบ้าง</span>
-                            </div>
-                            <div class="suggest-card" onclick="ask('ใครคือผู้เชี่ยวชาญด้าน IT')">
-                                <i data-lucide="users" style="color: #10b981; width: 22px;"></i>
-                                <span>ใครคือผู้เชี่ยวชาญด้าน IT</span>
-                            </div>
-                            <div class="suggest-card" onclick="ask('มีอบรมอะไรใหม่บ้างสัปดาห์นี้')">
-                                <i data-lucide="book-open" style="color: #ec4899; width: 22px;"></i>
-                                <span>มีอบรมอะไรใหม่บ้างสัปดาห์นี้</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="input-sticky">
-                <div class="input-bar">
-                    <button class="btn-circle"><i data-lucide="paperclip" style="width: 20px;"></i></button>
-                    <input type="text" id="chat-input" placeholder="Ask anything about UDRU..." autocomplete="off">
-                    <button class="btn-circle btn-send" id="send-trigger"><i data-lucide="send"
-                            style="width: 20px;"></i></button>
-                </div>
-                <div style="text-align: center; margin-top: 1rem; font-size: 0.7rem; color: #94a3b8; font-weight: 500;">
-                    Powered by UDRU KM Intelligence &bull; AI can make mistakes
                 </div>
             </div>
         </main>

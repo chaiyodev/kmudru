@@ -46,7 +46,7 @@ $recent_users = $pdo->query("SELECT * FROM users ORDER BY created_at DESC LIMIT 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ผู้ดูแลระบบ | UDRU Wisdom</title>
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
@@ -197,6 +197,10 @@ $recent_users = $pdo->query("SELECT * FROM users ORDER BY created_at DESC LIMIT 
                 <a href="category_create.php" class="action-card">
                     <i data-lucide="folder-plus" style="width: 32px; height: 32px;"></i>
                     <span style="font-weight: 600;">จัดการหมวดหมู่</span>
+                </a>
+                <a href="admin_logs.php" class="action-card">
+                    <i data-lucide="history" style="width: 32px; height: 32px;"></i>
+                    <span style="font-weight: 600;">System Logs</span>
                 </a>
             </div>
 

@@ -58,7 +58,7 @@ $users = $pdo->query("SELECT * FROM users ORDER BY created_at DESC")->fetchAll()
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>จัดการสมาชิก | UDRU Wisdom</title>
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
@@ -161,14 +161,19 @@ $users = $pdo->query("SELECT * FROM users ORDER BY created_at DESC")->fetchAll()
                                         <?php echo ucfirst($user['role']); ?>
                                     </span>
                                 </td>
-                                <td style="padding: 1rem; text-align: right;">
+                                <td
+                                    style="padding: 1rem; text-align: right; display: flex; gap: 0.5rem; justify-content: flex-end; align-items: center;">
+                                    <a href="admin_logs.php?user_id=<?php echo $user['id']; ?>" class="btn-icon"
+                                        title="View Logs" style="color: #64748b;">
+                                        <i data-lucide="history" style="width: 18px;"></i>
+                                    </a>
                                     <?php if ($user['id'] != $_SESSION['user_id']): ?>
                                         <form method="POST" onsubmit="return confirm('ยืนยันการลบสมาชิกนี้?');"
                                             style="display: inline;">
                                             <input type="hidden" name="action" value="delete_user">
                                             <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">
-                                            <button type="submit" class="btn-icon" style="color: red;"><i
-                                                    data-lucide="trash-2"></i></button>
+                                            <button type="submit" class="btn-icon" style="color: #ef4444;"><i
+                                                    data-lucide="trash-2" style="width: 18px;"></i></button>
                                         </form>
                                     <?php endif; ?>
                                 </td>

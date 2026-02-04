@@ -1,6 +1,7 @@
 <?php
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/security.php';
 
 $pdo = get_pdo();
 $user = null;
@@ -34,28 +35,49 @@ if ($pdo) {
         $stmt = $pdo->query("SELECT COUNT(*) FROM users WHERE role IN ('admin', 'contributor')");
         $stats['experts'] = $stmt->fetchColumn();
 
-        // Fetch latest recommended docs
-        $stmt = $pdo->query("SELECT d.*, c.name as category_name, u.username as author_username FROM documents d LEFT JOIN categories c ON d.category_id = c.id LEFT JOIN users u ON d.user_id = u.id WHERE d.status = 'published' ORDER BY d.created_at DESC LIMIT 3");
-        $latest_docs = $stmt->fetchAll();
+        // Fetch latest recommended docs (Content Spotlight - Mixed Types)
+        $doc_query = "
+            (SELECT d.id, d.title, d.content, d.type, d.category_id, d.user_id, d.views, d.created_at, d.tags,
+                   c.name as category_name, c.icon as category_icon, 
+                   u.username as author_username, u.full_name as author_full_name,
+                   (SELECT COUNT(*) FROM document_likes WHERE document_id = d.id) as like_count,
+                   (SELECT COUNT(*) FROM comments WHERE document_id = d.id) as comment_count,
+                   'view.php?id=' as base_url
+            FROM documents d 
+            LEFT JOIN categories c ON d.category_id = c.id 
+            LEFT JOIN users u ON d.user_id = u.id 
+            WHERE d.status = 'published')
+            UNION ALL
+            (SELECT t.id, t.title, t.description as content, 'training' as type, t.category_id, NULL as user_id, 0 as views, t.created_at, '' as tags,
+                   c.name as category_name, 'graduation-cap' as category_icon,
+                   'System' as author_username, 'UDRU Training' as author_full_name,
+                   0 as like_count, 0 as comment_count,
+                   'training_view.php?id=' as base_url
+            FROM trainings t
+            LEFT JOIN categories c ON t.category_id = c.id)
+            ORDER BY created_at DESC 
+            LIMIT 4";
+        $latest_docs = $pdo->query($doc_query)->fetchAll();
+
+        // Update type labels for display
+        $type_labels['training'] = 'การฝึกอบรม';
+        $type_labels['document'] = 'เอกสาร';
+        $type_labels['wiki'] = 'Wiki';
+        $type_labels['qa'] = 'Q&A';
 
         // Fetch trending topics
         $stmt = $pdo->query("SELECT c.id, c.name, COUNT(d.id) as doc_count FROM categories c LEFT JOIN documents d ON c.id = d.category_id GROUP BY c.id ORDER BY doc_count DESC LIMIT 8");
         $trending_topics = $stmt->fetchAll();
 
-        // Activity Feed (More comprehensive)
+        // Content Feed (Latest Documents/Articles)
         $activity_query = "
-            (SELECT 'document' as type, title as content, created_at, u.username, u.full_name 
-             FROM documents d JOIN users u ON d.user_id = u.id)
-            UNION
-            (SELECT 'comment' as type, comment as content, created_at, u.username, u.full_name 
-             FROM comments c JOIN users u ON c.user_id = u.id)
-            UNION
-            (SELECT 'training' as type, title as content, created_at, 'System' as username, 'Admin' as full_name 
-             FROM trainings)
-            UNION
-            (SELECT 'community' as type, name as content, created_at, 'System' as username, 'Admin' as full_name 
-             FROM communities)
-            ORDER BY created_at DESC LIMIT 10";
+            SELECT d.*, u.username, u.full_name, c.name as category_name, c.icon as category_icon
+            FROM documents d 
+            LEFT JOIN users u ON d.user_id = u.id 
+            LEFT JOIN categories c ON d.category_id = c.id
+            WHERE d.status = 'published'
+            ORDER BY d.created_at DESC 
+            LIMIT 8";
         $recent_activity = $pdo->query($activity_query)->fetchAll();
 
     } catch (PDOException $e) {
@@ -71,11 +93,202 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UDRU Wisdom | UDRU Knowledge Hub</title>
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .knowledge-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+        }
+
+        .premium-card {
+            background: white;
+            border: 1px solid #eef2f6;
+            border-radius: 1.25rem;
+            padding: 1.5rem;
+            position: relative;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+            overflow: hidden;
+        }
+
+        .premium-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.05);
+            border-color: var(--teal-primary);
+        }
+
+        .premium-card.is-recommended {
+            border: 2px solid #fdba74;
+            /* orange-300 */
+        }
+
+        .recommend-badge {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: #f97316;
+            color: white;
+            padding: 4px 16px;
+            font-size: 0.7rem;
+            font-weight: 800;
+            border-bottom-left-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+
+        .card-top {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .type-icon-box {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f1f5f9;
+            color: #64748b;
+        }
+
+        .type-tag {
+            padding: 4px 12px;
+            background: #f1f5f9;
+            color: #64748b;
+            border-radius: 100px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .card-title {
+            font-size: 1.125rem;
+            font-weight: 800;
+            line-height: 1.4;
+            color: #1e293b;
+            margin-bottom: 0.75rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .card-desc {
+            font-size: 0.875rem;
+            color: #64748b;
+            line-height: 1.6;
+            margin-bottom: 1.25rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .card-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            margin-top: auto;
+        }
+
+        .tag-pill {
+            padding: 4px 12px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            color: #64748b;
+            border-radius: 100px;
+            font-size: 0.6875rem;
+            font-weight: 600;
+        }
+
+        .card-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-top: 1rem;
+            border-top: 1px solid #f1f5f9;
+        }
+
+        .footer-author {
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+        }
+
+        .author-sm-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #f1f5f9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.6rem;
+            font-weight: 700;
+            color: var(--teal-primary);
+        }
+
+        .author-sm-name {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #475569;
+        }
+
+        .footer-stats {
+            display: flex;
+            align-items: center;
+            gap: 0.875rem;
+            color: #94a3b8;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .stat-item-sm {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        @media (max-width: 768px) {
+            .knowledge-grid {
+                grid-template-columns: 1fr !important;
+                gap: 1rem !important;
+            }
+
+            .premium-card {
+                padding: 1.25rem;
+            }
+
+            .grid-stats {
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 1rem !important;
+            }
+
+            .hero-centered {
+                padding: 2.5rem 1rem 3.5rem !important;
+            }
+
+            .hero-centered h1 {
+                font-size: 1.75rem !important;
+            }
+
+            .main-viewport {
+                padding: 1.25rem !important;
+            }
+        }
+    </style>
 </head>
 
 <body>
@@ -152,44 +365,97 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
             </div>
 
             <!-- Content Area -->
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2.5rem;">
+            <div class="main-content-grid" style="display: grid; grid-template-columns: 2fr 1fr; gap: 2.5rem;">
                 <section>
                     <div
                         style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-                        <h3 style="font-size: 1.25rem; font-weight: 700;">องค์ความรู้แนะนำ</h3>
+                        <h3
+                            style="font-size: 1.25rem; font-weight: 800; display: flex; align-items: center; gap: 0.75rem; color: #0f172a;">
+                            <div
+                                style="width: 32px; height: 32px; background: rgba(20, 184, 166, 0.1); color: var(--teal-primary); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                                <i data-lucide="trending-up" style="width: 18px;"></i>
+                            </div>
+                            เนื้อหาแนะนำ
+                        </h3>
                         <a href="browse.php"
-                            style="color: var(--teal-primary); font-size: 0.875rem; font-weight: 600; text-decoration: none;">ดูทั้งหมด</a>
+                            style="color: var(--teal-primary); font-size: 0.875rem; font-weight: 700; text-decoration: none; display: flex; align-items: center; gap: 0.25rem;">
+                            ดูทั้งหมด <i data-lucide="arrow-right" style="width: 16px;"></i>
+                        </a>
                     </div>
-                    <div class="knowledge-grid" style="grid-template-columns: 1fr;">
-                        <?php foreach ($latest_docs as $doc): ?>
-                            <div class="card_knowledge" onclick="location.href='view.php?id=<?php echo $doc['id']; ?>'"
-                                style="cursor: pointer; margin-bottom: 1.5rem; background: white; border-radius: 0.75rem; border: 1px solid var(--border-color); padding: 1.5rem; transition: var(--transition-base); box-shadow: rgba(20, 29, 31, 0.05) 0px 1px 2px 0px;">
-                                <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-                                    <span class="tag-badge"
-                                        style="background: hsl(var(--primary) / 0.1); color: var(--teal-primary);"><?php echo $type_labels[$doc['type']]; ?></span>
-                                    <span class="tag-badge"><?php echo e($doc['category_name']); ?></span>
+
+                    <div class="knowledge-grid">
+                        <?php
+                        $idx = 0;
+                        foreach ($latest_docs as $doc):
+                            $idx++;
+                            $type_icon = 'file-text';
+                            $brand_color = '#3b82f6'; // blue
+                            if ($doc['type'] == 'wiki') {
+                                $type_icon = 'book-open';
+                                $brand_color = '#a855f7'; // purple
+                            } elseif ($doc['type'] == 'qa') {
+                                $type_icon = 'help-circle';
+                                $brand_color = '#f59e0b'; // orange
+                            } elseif ($doc['type'] == 'training') {
+                                $type_icon = 'graduation-cap';
+                                $brand_color = '#10b981'; // teal/green
+                            }
+
+                            $is_recommended = ($idx <= 2);
+                            ?>
+                            <div class="premium-card <?php echo $is_recommended ? 'is-recommended' : ''; ?>"
+                                onclick="location.href='<?php echo $doc['base_url'] . $doc['id']; ?>'">
+
+                                <?php if ($is_recommended): ?>
+                                    <div class="recommend-badge">แนะนำ</div>
+                                <?php endif; ?>
+
+                                <div class="card-top">
+                                    <div class="type-icon-box"
+                                        style="background: <?php echo $brand_color; ?>15; color: <?php echo $brand_color; ?>;">
+                                        <i data-lucide="<?php echo $type_icon; ?>" style="width: 18px;"></i>
+                                    </div>
+                                    <span class="type-tag"><?php echo $type_labels[$doc['type']] ?? 'เนื้อหา'; ?></span>
                                 </div>
-                                <h3
-                                    style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.75rem; color: hsl(var(--foreground));">
-                                    <?php echo e($doc['title']); ?>
-                                </h3>
-                                <p
-                                    style="font-size: 0.9375rem; color: hsl(var(--muted-foreground)); line-height: 1.6; margin-bottom: 1.5rem;">
-                                    <?php echo mb_strimwidth(strip_tags($doc['content']), 0, 160, "..."); ?>
+
+                                <h3 class="card-title"><?php echo e($doc['title']); ?></h3>
+                                <p class="card-desc">
+                                    <?php echo mb_strimwidth(strip_tags($doc['content']), 0, 150, "..."); ?>
                                 </p>
-                                <div
-                                    style="display: flex; justify-content: space-between; align-items: center; padding-top: 1rem; border-top: 1px solid var(--border-color);">
-                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                        <div class="author-avatar">
-                                            <?php echo strtoupper(substr($doc['author_username'] ?? 'U', 0, 2)); ?>
+
+                                <div class="card-tags">
+                                    <?php
+                                    $tags = !empty($doc['tags']) ? explode(',', $doc['tags']) : [];
+                                    if (empty($tags))
+                                        $tags = [$doc['category_name']];
+                                    foreach (array_slice($tags, 0, 3) as $tag):
+                                        ?>
+                                        <span class="tag-pill"><?php echo htmlspecialchars(trim($tag)); ?></span>
+                                    <?php endforeach; ?>
+                                </div>
+
+                                <div class="card-footer">
+                                    <div class="footer-author">
+                                        <div class="author-sm-avatar">
+                                            <?php echo strtoupper(substr($doc['author_username'] ?? 'U', 0, 1)); ?>
                                         </div>
                                         <span
-                                            style="font-size: 0.875rem; font-weight: 600;"><?php echo e($doc['author_username'] ?? 'Anonymous'); ?></span>
+                                            class="author-sm-name"><?php echo e($doc['author_full_name'] ?? $doc['author_username'] ?? 'Anonymous'); ?></span>
                                     </div>
-                                    <div
-                                        style="display: flex; gap: 1rem; color: hsl(var(--muted-foreground)); font-size: 0.8125rem;">
-                                        <span><i data-lucide="eye" style="width: 14px; vertical-align: middle;"></i>
-                                            <?php echo e($doc['views']); ?></span>
+
+                                    <div class="footer-stats">
+                                        <div class="stat-item-sm">
+                                            <i data-lucide="eye" style="width: 12px;"></i>
+                                            <?php echo e($doc['views']); ?>
+                                        </div>
+                                        <div class="stat-item-sm">
+                                            <i data-lucide="heart" style="width: 12px;"></i>
+                                            <?php echo e($doc['like_count']); ?>
+                                        </div>
+                                        <div class="stat-item-sm">
+                                            <i data-lucide="message-circle" style="width: 12px;"></i>
+                                            <?php echo e($doc['comment_count']); ?>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -230,36 +496,30 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
 
                     <div
                         style="margin-top: 2rem; background: white; border-radius: 0.75rem; border: 1px solid var(--border-color); padding: 1.5rem;">
-                        <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 1.5rem;">ความเคลื่อนไหวล่าสุด</h3>
+                        <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 1.5rem;">เนื้อหาอัปเดตล่าสุด</h3>
                         <div style="display: flex; flex-direction: column; gap: 1.25rem;">
                             <?php foreach ($recent_activity as $act): ?>
                                 <div style="display: flex; gap: 0.75rem;">
                                     <div
-                                        style="width: 32px; height: 32px; background: hsl(var(--muted)); border-radius: 50%; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700;">
-                                        <?php echo strtoupper(substr($act['username'], 0, 1)); ?>
+                                        style="width: 32px; height: 32px; background: rgba(20, 184, 166, 0.1); color: var(--teal-primary); border-radius: 8px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                                        <i data-lucide="<?php echo $act['category_icon'] ?? 'file-text'; ?>"
+                                            style="width: 16px;"></i>
                                     </div>
-                                    <div style="flex: 1;">
-                                        <p style="font-size: 0.8125rem; font-weight: 600;">
-                                            <?php echo htmlspecialchars($act['full_name']); ?>
-                                            <span style="font-weight: 400; color: hsl(var(--muted-foreground));">
-                                                <?php
-                                                if ($act['type'] == 'document')
-                                                    echo 'สร้างบทความใหม่';
-                                                elseif ($act['type'] == 'comment')
-                                                    echo 'แสดงความคิดเห็น';
-                                                elseif ($act['type'] == 'training')
-                                                    echo 'เพิ่มหลักสูตรอบรมใหม่';
-                                                elseif ($act['type'] == 'community')
-                                                    echo 'สร้างชุมชน CoP ใหม่';
-                                                ?>
-                                            </span>
-                                        </p>
-                                        <p
-                                            style="font-size: 0.75rem; color: var(--teal-primary); font-weight: 500; margin-top: 2px;">
-                                            <?php echo mb_strimwidth($act['content'], 0, 40, "..."); ?>
-                                        </p>
-                                        <span
-                                            style="font-size: 0.65rem; color: #94a3b8;"><?php echo date('d/m/Y H:i', strtotime($act['created_at'])); ?></span>
+                                    <div style="flex: 1; min-width: 0;">
+                                        <a href="view.php?id=<?php echo $act['id']; ?>"
+                                            style="text-decoration: none; color: #1e293b; font-size: 0.8125rem; font-weight: 700; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px;">
+                                            <?php echo htmlspecialchars($act['title']); ?>
+                                        </a>
+                                        <div
+                                            style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.6875rem; color: #64748b;">
+                                            <span
+                                                style="color: var(--teal-primary); font-weight: 600;"><?php echo htmlspecialchars($act['category_name'] ?? 'ทั่วไป'); ?></span>
+                                            <span>&bull;</span>
+                                            <span><?php echo htmlspecialchars($act['full_name'] ?? 'System'); ?></span>
+                                        </div>
+                                        <span style="font-size: 0.625rem; color: #94a3b8; display: block; margin-top: 2px;">
+                                            <?php echo date('d M Y', strtotime($act['created_at'])); ?>
+                                        </span>
                                     </div>
                                 </div>
                             <?php endforeach; ?>

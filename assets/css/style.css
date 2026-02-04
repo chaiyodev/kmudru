@@ -68,15 +68,29 @@ body {
     z-index: 100;
     display: flex;
     flex-direction: column;
-    padding: 1.5rem 1rem;
+    padding: 1rem 0.75rem;
     transition: width 0.3s ease, padding 0.3s ease;
     overflow: hidden;
+}
+
+.sidebar-nav-container {
+    flex: 1;
+    overflow-y: hidden;
+    /* Force total visibility without scroll */
+    overflow-x: hidden;
+    margin: 0.25rem 0;
+}
+
+.sidebar-footer {
+    margin-top: auto;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 /* Collapsed Sidebar State */
 .sidebar.collapsed {
     width: var(--sidebar-collapsed-width);
-    padding: 1.5rem 0.75rem;
+    padding: 1.5rem 0.5rem;
 }
 
 .sidebar.collapsed .brand-info,
@@ -98,19 +112,19 @@ body {
 
 /* Sidebar Toggle Button */
 .sidebar-toggle {
-    margin-top: auto;
+    margin-top: 0.5rem;
     padding: 0.75rem;
     background: rgba(255, 255, 255, 0.05);
     border: none;
     border-radius: 0.5rem;
-    color: rgba(255, 255, 255, 0.6);
+    color: rgba(255, 255, 255, 0.82);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
     font-size: 0.8125rem;
-    font-weight: 500;
+    font-weight: 600;
     font-family: inherit;
     transition: var(--transition-base);
     width: 100%;
@@ -126,7 +140,7 @@ body {
 }
 
 .sidebar-brand {
-    padding: 0.5rem 0.5rem 2rem;
+    padding: 0.25rem 0.25rem 0.75rem;
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -157,14 +171,14 @@ body {
 }
 
 .nav-group {
-    margin-bottom: 2rem;
+    margin-bottom: 1.25rem;
 }
 
 .nav-label {
-    padding: 0 0.75rem 0.5rem;
-    font-size: 0.7rem;
+    padding: 0 0.75rem 0.45rem;
+    font-size: 0.65rem;
     font-weight: 600;
-    color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.35);
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
@@ -173,12 +187,12 @@ body {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    padding: 0.625rem 0.75rem;
+    padding: 0.5rem 0.75rem;
     color: rgba(255, 255, 255, 0.6);
     text-decoration: none;
-    font-size: 0.875rem;
+    font-size: 0.85rem;
     font-weight: 500;
-    border-radius: 0.5rem;
+    border-radius: 0.625rem;
     transition: var(--transition-base);
 }
 
@@ -196,6 +210,8 @@ body {
 .nav-link.active {
     background-color: var(--teal-primary);
     color: white;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(20, 184, 166, 0.25);
 }
 
 .nav-pill {
@@ -674,18 +690,46 @@ body.sidebar-collapsed .main-viewport {
 }
 
 /* Sidebar User Profile */
+.profile-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background-size: cover;
+    background-position: center;
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    flex-shrink: 0;
+    background-color: var(--teal-primary);
+}
+
 .user-profile-card {
-    padding: 0.75rem;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
-    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    margin-bottom: 0.25rem;
     border: 1px solid rgba(255, 255, 255, 0.1);
     transition: var(--transition-base);
+    color: white;
+}
+
+.profile-info .profile-name {
+    color: #ffffff !important;
+    font-weight: 800 !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.profile-info .role-badge {
+    color: rgba(255, 255, 255, 0.8) !important;
+    font-weight: 700 !important;
 }
 
 .sidebar.collapsed .user-profile-card {
-    padding: 0.5rem 0;
-    margin-bottom: 0.5rem;
+    padding: 0.25rem 0;
+    margin-bottom: 0.25rem;
     border: none;
     background: transparent !important;
     box-shadow: none !important;
@@ -704,11 +748,161 @@ body.sidebar-collapsed .main-viewport {
 .sidebar.collapsed .profile-avatar {
     margin: 0;
     display: flex !important;
-    background: var(--teal-primary) !important;
+    background-color: var(--teal-primary) !important;
     color: white !important;
     border-radius: 10px;
-    width: 36px !important;
-    height: 36px !important;
+    width: 40px !important;
+    height: 40px !important;
     font-size: 1rem;
-    box-shadow: 0 4px 12px rgba(20, 184, 166, 0.2);
+    box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Mobile Responsive Global Overrides */
+@media (max-width: 1024px) {
+    :root {
+        --sidebar-width: 0px;
+        --sidebar-collapsed-width: 0px;
+    }
+
+    .sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+    }
+
+    .sidebar.mobile-open {
+        transform: translateX(0);
+        width: 260px;
+        /* Reduced width */
+        box-shadow: 10px 0 30px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Force labels to show on mobile even if collapsed on desktop */
+    .sidebar.mobile-open .brand-info,
+    .sidebar.mobile-open .nav-label,
+    .sidebar.mobile-open .nav-link span,
+    .sidebar.mobile-open .nav-pill,
+    .sidebar.mobile-open .profile-info,
+    .sidebar.mobile-open .profile-actions {
+        display: block !important;
+    }
+
+    .sidebar.mobile-open .nav-link {
+        justify-content: flex-start !important;
+        padding: 0.75rem 1rem !important;
+    }
+
+    .sidebar.mobile-open .brand-icon {
+        margin: 0 !important;
+    }
+
+    .sidebar.mobile-open .sidebar-toggle {
+        display: none !important;
+        /* Hide collapse toggle on mobile drawer */
+    }
+
+    .main-viewport {
+        margin-left: 0 !important;
+        padding: 1.5rem 1rem !important;
+    }
+
+    .header-top {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1.25rem;
+    }
+
+    .header-actions {
+        width: 100%;
+    }
+
+    .btn-primary {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .mobile-top-bar {
+        display: flex !important;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.625rem 1.25rem;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--border-color);
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 999;
+        width: 100%;
+    }
+
+    .mobile-logo-box {
+        width: 36px;
+        height: 36px;
+        background: var(--teal-primary);
+        color: white;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 8px rgba(20, 184, 166, 0.2);
+    }
+
+    .mobile-brand-name {
+        font-weight: 800;
+        font-size: 1.1rem;
+        color: var(--teal-primary);
+        letter-spacing: -0.01em;
+    }
+
+    .mobile-menu-btn {
+        background: #f1f5f9;
+        border: none;
+        color: #1e293b;
+        cursor: pointer;
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: var(--transition-base);
+    }
+
+    .main-viewport {
+        margin-left: 0 !important;
+        padding: 5rem 1.25rem 2rem 1.25rem !important;
+    }
+}
+
+.mobile-top-bar {
+    display: none;
+}
+
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 99;
+    backdrop-filter: blur(2px);
+}
+
+.sidebar.mobile-open~.sidebar-overlay {
+    display: block;
+}
+
+@media (max-width: 640px) {
+    .grid-stats {
+        grid-template-columns: 1fr !important;
+    }
+
+    .hero-centered h1 {
+        font-size: 1.5rem !important;
+    }
 }
