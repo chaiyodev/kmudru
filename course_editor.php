@@ -82,16 +82,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_settings'])) {
     exit;
 }
 
-// Delete Actions
-if (isset($_GET['delete_lesson'])) {
-    $l_id = (int) $_GET['delete_lesson'];
-    $pdo->exec("DELETE FROM course_lessons WHERE id = $l_id AND course_id = $id");
+// Delete Actions (Secure: POST + CSRF)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_lesson'])) {
+    verify_csrf_token($_POST['csrf_token'] ?? '');
+    $l_id = (int) $_POST['delete_lesson'];
+    $stmt = $pdo->prepare("DELETE FROM course_lessons WHERE id = ? AND course_id = ?");
+    $stmt->execute([$l_id, $id]);
     header("Location: course_editor.php?id=$id&tab=lessons");
     exit;
 }
-if (isset($_GET['delete_quiz'])) {
-    $q_id = (int) $_GET['delete_quiz'];
-    $pdo->exec("DELETE FROM quizzes WHERE id = $q_id AND course_id = $id");
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_quiz'])) {
+    verify_csrf_token($_POST['csrf_token'] ?? '');
+    $q_id = (int) $_POST['delete_quiz'];
+    $stmt = $pdo->prepare("DELETE FROM quizzes WHERE id = ? AND course_id = ?");
+    $stmt->execute([$q_id, $id]);
     header("Location: course_editor.php?id=$id&tab=quiz");
     exit;
 }
@@ -265,9 +269,11 @@ $all_quizzes = $quizzes->fetchAll();
                                                     <?php echo htmlspecialchars($l['duration']); ?></div>
                                             </div>
                                         </div>
-                                        <a href="?id=<?php echo $id; ?>&tab=lessons&delete_lesson=<?php echo $l['id']; ?>"
-                                            class="action-btn delete" onclick="return confirm('ลบ?');"><i
-                                                data-lucide="trash-2"></i></a>
+                                        <form method="POST" style="display:inline;" onsubmit="return confirm('ลบบทเรียนนี้?');">
+                                            <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
+                                            <input type="hidden" name="delete_lesson" value="<?php echo $l['id']; ?>">
+                                            <button type="submit" class="action-btn delete" style="background:none;border:none;cursor:pointer;color:inherit;padding:6px;"><i data-lucide="trash-2"></i></button>
+                                        </form>
                                     </div>
                                 <?php endforeach; ?>
                             </div>
@@ -317,9 +323,11 @@ $all_quizzes = $quizzes->fetchAll();
                                                     <?php echo $q['correct_answer']; ?></div>
                                             </div>
                                         </div>
-                                        <a href="?id=<?php echo $id; ?>&tab=quiz&delete_quiz=<?php echo $q['id']; ?>"
-                                            class="action-btn delete" onclick="return confirm('ลบ?');"><i
-                                                data-lucide="trash-2"></i></a>
+                                        <form method="POST" style="display:inline;" onsubmit="return confirm('ลบคำถามนี้?');">
+                                            <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
+                                            <input type="hidden" name="delete_quiz" value="<?php echo $q['id']; ?>">
+                                            <button type="submit" class="action-btn delete" style="background:none;border:none;cursor:pointer;color:inherit;padding:6px;"><i data-lucide="trash-2"></i></button>
+                                        </form>
                                     </div>
                                 <?php endforeach; ?>
                             </div>

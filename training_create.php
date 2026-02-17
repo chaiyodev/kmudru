@@ -104,16 +104,20 @@ if ($id > 0 && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_questi
     exit;
 }
 
-// --- DELETE ACTIONS ---
-if (isset($_GET['delete_lesson']) && $id > 0) {
-    $l_id = (int) $_GET['delete_lesson'];
-    $pdo->exec("DELETE FROM course_lessons WHERE id = $l_id AND course_id = $id");
+// --- DELETE ACTIONS (Secure: POST + CSRF) ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_lesson']) && $id > 0) {
+    verify_csrf_token($_POST['csrf_token'] ?? '');
+    $l_id = (int) $_POST['delete_lesson'];
+    $stmt = $pdo->prepare("DELETE FROM course_lessons WHERE id = ? AND course_id = ?");
+    $stmt->execute([$l_id, $id]);
     header("Location: training_create.php?id=$id&tab=lessons");
     exit;
 }
-if (isset($_GET['delete_quiz']) && $id > 0) {
-    $q_id = (int) $_GET['delete_quiz'];
-    $pdo->exec("DELETE FROM quizzes WHERE id = $q_id AND course_id = $id");
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_quiz']) && $id > 0) {
+    verify_csrf_token($_POST['csrf_token'] ?? '');
+    $q_id = (int) $_POST['delete_quiz'];
+    $stmt = $pdo->prepare("DELETE FROM quizzes WHERE id = ? AND course_id = ?");
+    $stmt->execute([$q_id, $id]);
     header("Location: training_create.php?id=$id&tab=quiz");
     exit;
 }
@@ -476,9 +480,13 @@ if (isset($_GET['status']) && $_GET['status'] == 'created') {
                                                 </div>
                                             </div>
                                         </div>
-                                        <a href="?id=<?php echo $id; ?>&tab=lessons&delete_lesson=<?php echo $l['id']; ?>"
-                                            onclick="return confirm('ลบบทเรียนนี้?');" style="color: #ef4444;"><i
-                                                data-lucide="trash-2" style="width: 18px;"></i></a>
+                                        <form method="POST" style="display:inline;" onsubmit="return confirm('ลบบทเรียนนี้?');">
+                                            <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
+                                            <input type="hidden" name="delete_lesson" value="<?php echo $l['id']; ?>">
+                                            <button type="submit"
+                                                style="background:none;border:none;cursor:pointer;color:#ef4444;padding:0;"><i
+                                                    data-lucide="trash-2" style="width: 18px;"></i></button>
+                                        </form>
                                     </div>
                                 <?php endforeach; ?>
                             </div>
@@ -544,9 +552,14 @@ if (isset($_GET['status']) && $_GET['status'] == 'created') {
                                                 </div>
                                             </div>
                                         </div>
-                                        <a href="?id=<?php echo $id; ?>&tab=quiz&delete_quiz=<?php echo $q['id']; ?>"
-                                            onclick="return confirm('ลบคำถามข้อนี้?');" style="color: #ef4444;"><i
-                                                data-lucide="trash-2" style="width: 18px;"></i></a>
+                                        <form method="POST" style="display:inline;"
+                                            onsubmit="return confirm('ลบคำถามข้อนี้?');">
+                                            <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
+                                            <input type="hidden" name="delete_quiz" value="<?php echo $q['id']; ?>">
+                                            <button type="submit"
+                                                style="background:none;border:none;cursor:pointer;color:#ef4444;padding:0;"><i
+                                                    data-lucide="trash-2" style="width: 18px;"></i></button>
+                                        </form>
                                     </div>
                                 <?php endforeach; ?>
                             </div>

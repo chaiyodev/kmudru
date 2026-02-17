@@ -11,6 +11,8 @@ $error = '';
 $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf_token($_POST['csrf_token'] ?? '');
+
     $username = $_POST['username'] ?? '';
     $password = $_POST['password'] ?? '';
     $full_name = $_POST['full_name'] ?? '';
@@ -147,6 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php endif; ?>
 
         <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
             <div class="form-group">
                 <label class="form-label">ชื่อ-นามสกุล</label>
                 <input type="text" name="full_name" class="form-control" placeholder="เช่น นายสมชาย ใจดี" required>

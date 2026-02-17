@@ -170,6 +170,12 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                                 style="background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));"><i
                                     data-lucide="share-2"></i>แชร์</button>
 
+                            <?php if (isset($_SESSION['user_id']) && ($_SESSION['user_id'] == $doc['user_id'] || $_SESSION['role'] === 'admin')): ?>
+                                <a href="edit.php?id=<?php echo $doc['id']; ?>" class="btn-primary"
+                                    style="background: white; color: hsl(var(--foreground)); border: 1px solid var(--border-color);">
+                                    <i data-lucide="edit"></i>แก้ไข
+                                </a>
+                            <?php endif; ?>
                             <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
                                 <form method="POST"
                                     onsubmit="return confirm('คุณต้องการลบบทความนี้ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้');"

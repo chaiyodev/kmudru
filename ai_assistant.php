@@ -24,12 +24,46 @@ if (isset($_POST['ajax_chat'])) {
         exit;
     }
 
+    // --- RATE LIMITING (30 requests per 5 minutes) ---
+    if (!isset($_SESSION['ai_rate']))
+        $_SESSION['ai_rate'] = ['count' => 0, 'start' => time()];
+    if (time() - $_SESSION['ai_rate']['start'] > 300) {
+        $_SESSION['ai_rate'] = ['count' => 0, 'start' => time()];
+    }
+    $_SESSION['ai_rate']['count']++;
+    if ($_SESSION['ai_rate']['count'] > 30) {
+        echo json_encode(['response' => '⏳ **คุณส่งข้อความเร็วเกินไปครับ** กรุณารอสักครู่แล้วลองใหม่นะครับ (จำกัด 30 ข้อความ / 5 นาที)']);
+        exit;
+    }
+
+    // --- CONVERSATION MEMORY (Store last 10 messages) ---
+    if (!isset($_SESSION['ai_history']))
+        $_SESSION['ai_history'] = [];
+    $_SESSION['ai_history'][] = ['role' => 'user', 'text' => $msg, 'time' => time()];
+    // Keep only last 10 entries
+    if (count($_SESSION['ai_history']) > 10) {
+        $_SESSION['ai_history'] = array_slice($_SESSION['ai_history'], -10);
+    }
+
     log_activity('ai_chat', 'question', $msg);
 
-    // --- SMART INTELLIGENCE LOGIC (RAG-lite) ---
+    // --- CONTEXT RESOLUTION (Resolve references like "นี้", "อันนี้", "เรื่องนี้") ---
+    $msg_lower = mb_strtolower($msg);
+    $resolved_context = '';
+
+    if (preg_match('/(เรื่องนี้|อันนี้|บทความนี้|คอร์สนี้|คนนี้|ของนี้)/u', $msg_lower)) {
+        // Look back in history for the last AI result that had a title/topic
+        foreach (array_reverse($_SESSION['ai_history']) as $h) {
+            if ($h['role'] === 'ai_result' && !empty($h['text'])) {
+                $resolved_context = $h['text'];
+                break;
+            }
+        }
+    }
+
+    // --- SMART INTELLIGENCE LOGIC (RAG-lite v3.0) ---
 
     // 1. Detect Intent
-    $msg_lower = mb_strtolower($msg);
     $intent = 'search';
 
     if (preg_match('/(จำนวน|กี่|เท่าไหร่|สรุปสถิติ|สถิติ)/u', $msg_lower))
@@ -50,6 +84,8 @@ if (isset($_POST['ajax_chat'])) {
         $intent = 'greeting';
     else if (preg_match('/(ฉลาดแค่ไหน|เก่งไหม|ระดับ|level|version|ศักยภาพ|ความสามารถ|ทำอะไรได้)/u', $msg_lower))
         $intent = 'capability';
+    else if (preg_match('/(ประวัติ|คุยอะไรไป|ย้อนดู|chat history)/u', $msg_lower))
+        $intent = 'history';
 
     $results = [];
     $ai_response = "";
@@ -60,7 +96,7 @@ if (isset($_POST['ajax_chat'])) {
             <div style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
                 <div style="background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%); padding: 1.5rem; color: white;">
                     <div style="font-size: 0.85rem; opacity: 0.9; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">System Status</div>
-                    <div style="font-size: 1.5rem; font-weight: 800; margin-top: 0.25rem;">UDRU Wisdom AI v2.5</div>
+                    <div style="font-size: 1.5rem; font-weight: 800; margin-top: 0.25rem;">UDRU Wisdom AI v3.0</div>
                     <div style="display: inline-block; background: rgba(255,255,255,0.2); padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; margin-top: 0.5rem;">
                         ⚡ Domain-Specific Intelligence
                     </div>
@@ -94,13 +130,41 @@ if (isset($_POST['ajax_chat'])) {
             </div>';
             break;
 
+        case 'history':
+            $history = $_SESSION['ai_history'] ?? [];
+            $user_msgs = array_filter($history, fn($h) => $h['role'] === 'user');
+            if (count($user_msgs) <= 1) {
+                $ai_response = "📝 **ยังไม่มีประวัติการสนทนาก่อนหน้าครับ** นี่คือข้อความแรกของคุณเลย!\n\nลองถามอะไรมาได้เลยครับ ผมพร้อมช่วยเหลือ 😊";
+            } else {
+                $ai_response = "📝 **ประวัติการสนทนาล่าสุดของเรา (" . count($user_msgs) . " ข้อความ):**\n\n";
+                $idx = 1;
+                foreach ($user_msgs as $h) {
+                    $time_ago = time() - $h['time'];
+                    $time_str = $time_ago < 60 ? 'เมื่อสักครู่' : ($time_ago < 3600 ? round($time_ago / 60) . ' นาทีก่อน' : round($time_ago / 3600) . ' ชม. ก่อน');
+                    $ai_response .= $idx . ". 💬 *\"{$h['text']}\"* — {$time_str}\n";
+                    $idx++;
+                }
+                $ai_response .= "\n*ผมจำได้ทั้งหมดครับ! ถ้าอยากกลับไปเรื่องไหน บอกได้เลย* 🧠";
+            }
+            break;
+
         case 'greeting':
-            $greetings = [
-                "สวัสดีครับ! 👋 มีอะไรให้ผมช่วยค้นหาในคลังปัญญา UDRU วันนี้ไหมครับ?",
-                "ยินดีที่ได้พบครับ! 😊 ท่านต้องการหาเอกสาร, ผู้เชี่ยวชาญ หรือคอร์สอบรมดีครับ?",
-                "สวัสดีครับ 🙏 ผมพร้อมเป็นผู้ช่วยอัจฉริยะของคุณแล้ว ถามมาได้เลยครับ!",
-                "ทักทายครับ! วันนี้สนใจรับข่าวสารหรือข้อมูลด้านไหนเป็นพิเศษไหมครับ?"
-            ];
+            // Context-aware greeting
+            $total_history = count($_SESSION['ai_history'] ?? []);
+            if ($total_history > 2) {
+                $greetings = [
+                    "สวัสดีอีกครั้งครับ! 👋 ยินดีที่ได้คุยกันต่อครับ มีอะไรให้ช่วยเพิ่มเติมไหมครับ?",
+                    "กลับมาอีกแล้วนะครับ! 😊 วันนี้เราคุยกันมาแล้ว " . ($total_history - 1) . " ข้อความ ยังสนใจเรื่องอะไรอีกไหมครับ?",
+                    "สวัสดีครับ! ผมจำได้ว่าเราเคยคุยกันก่อนหน้านี้ 🧠 ถามต่อเรื่องเดิมหรือเรื่องใหม่ก็ได้เลยครับ!"
+                ];
+            } else {
+                $greetings = [
+                    "สวัสดีครับ! 👋 มีอะไรให้ผมช่วยค้นหาในคลังปัญญา UDRU วันนี้ไหมครับ?",
+                    "ยินดีที่ได้พบครับ! 😊 ท่านต้องการหาเอกสาร, ผู้เชี่ยวชาญ หรือคอร์สอบรมดีครับ?",
+                    "สวัสดีครับ 🙏 ผมพร้อมเป็นผู้ช่วยอัจฉริยะของคุณแล้ว ถามมาได้เลยครับ!",
+                    "ทักทายครับ! วันนี้สนใจรับข่าวสารหรือข้อมูลด้านไหนเป็นพิเศษไหมครับ?"
+                ];
+            }
             $ai_response = $greetings[array_rand($greetings)];
             break;
 
@@ -146,8 +210,9 @@ if (isset($_POST['ajax_chat'])) {
         case 'latest':
             $limit = 3;
             if (preg_match('/([0-9]+)/', $msg, $matches) || preg_match('/(หนึ่ง|1|อันเดียว|เรื่องเดียว)/u', $msg_lower)) {
-                $limit = (int)($matches[1] ?? 1);
-                if (preg_match('/(หนึ่ง|อันเดียว|เรื่องเดียว)/u', $msg_lower)) $limit = 1;
+                $limit = (int) ($matches[1] ?? 1);
+                if (preg_match('/(หนึ่ง|อันเดียว|เรื่องเดียว)/u', $msg_lower))
+                    $limit = 1;
             }
             $limit = max(1, min($limit, 5)); // Clamp between 1-5
 
@@ -155,7 +220,7 @@ if (isset($_POST['ajax_chat'])) {
             $stmt->bindValue(1, $limit, PDO::PARAM_INT);
             $stmt->execute();
             $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
+
             if ($limit === 1 && !empty($results))
                 $ai_response = "🆕 **นี่คือเอกสารที่อัปเดตเข้ามาล่าสุดครับ:**\n\n";
             else
@@ -166,8 +231,9 @@ if (isset($_POST['ajax_chat'])) {
             $limit = 3;
             // Check for specific number request e.g., "ขอ 1 คอร์ส", "เลือกมา 1"
             if (preg_match('/([0-9]+)/', $msg, $matches) || preg_match('/(หนึ่ง|1|คอร์สเดียว|อันเดียว)/u', $msg_lower)) {
-                 $limit = (int)($matches[1] ?? 1);
-                 if (preg_match('/(หนึ่ง|คอร์สเดียว|อันเดียว)/u', $msg_lower)) $limit = 1;
+                $limit = (int) ($matches[1] ?? 1);
+                if (preg_match('/(หนึ่ง|คอร์สเดียว|อันเดียว)/u', $msg_lower))
+                    $limit = 1;
             }
             $limit = max(1, min($limit, 5));
 
@@ -179,19 +245,19 @@ if (isset($_POST['ajax_chat'])) {
             foreach ($results as &$r) {
                 $r['origin'] = 'training';
             }
-            
+
             if ($limit === 1)
-                 $ai_response = "🎓 **นี่คือ 1 หลักสูตรอบรมที่ผมคัดมาแนะนำให้คุณโดยเฉพาะครับ:**\n\n";
+                $ai_response = "🎓 **นี่คือ 1 หลักสูตรอบรมที่ผมคัดมาแนะนำให้คุณโดยเฉพาะครับ:**\n\n";
             else
-                 $ai_response = "🎓 **หลักสูตรอบรมแนะนำ $limit รายการ เพื่อการพัฒนาทักษะ (Skill Up) ของคุณ:**\n\n";
+                $ai_response = "🎓 **หลักสูตรอบรมแนะนำ $limit รายการ เพื่อการพัฒนาทักษะ (Skill Up) ของคุณ:**\n\n";
             break;
 
         case 'expert':
             $clean_name = str_replace(['ใคร', 'คือ', 'คนไหน', 'ผู้เชี่ยวชาญ', 'หา', 'ต้องการ', 'ขอ', 'คน', 'ท่าน'], '', $msg);
             $limit = 3;
             if (preg_match('/([0-9]+)/', $msg, $matches)) {
-                 $limit = (int)$matches[1];
-                 $clean_name = str_replace($matches[1], '', $clean_name); // Remove number from name search
+                $limit = (int) $matches[1];
+                $clean_name = str_replace($matches[1], '', $clean_name); // Remove number from name search
             }
             $limit = max(1, min($limit, 5));
             $clean_name = trim($clean_name);
@@ -210,8 +276,13 @@ if (isset($_POST['ajax_chat'])) {
             break;
 
         case 'summarize':
-            $clean_query = str_replace(['สรุป', 'ย่อ', 'ขอ', 'หน่อย', 'บทความ', 'เรื่อง', 'เนื้อหา', 'ใจความ', 'สำคัญ', 'ของ', 'ให้', 'ครับ', 'ค่ะ', 'ที'], '', $msg);
+            $clean_query = str_replace(['สรุป', 'ย่อ', 'ขอ', 'หน่อย', 'บทความ', 'เรื่อง', 'เนื้อหา', 'ใจความ', 'สำคัญ', 'ของ', 'ให้', 'ครับ', 'ค่ะ', 'ที', 'นี้', 'อันนี้', 'เรื่องนี้'], '', $msg);
             $clean_query = trim($clean_query);
+
+            // Use conversation context if query is too short
+            if (mb_strlen($clean_query) < 2 && !empty($resolved_context)) {
+                $clean_query = $resolved_context;
+            }
 
             if (mb_strlen($clean_query) < 2) {
                 $ai_response = "🤔 **ขอทราบชื่อเรื่องที่ต้องการให้สรุปด้วยครับ** เช่น 'สรุปเรื่อง KM' หรือ 'ขอใจความสำคัญของ EdPEx'";
@@ -404,13 +475,46 @@ if (isset($_POST['ajax_chat'])) {
                 }
             }
             $results = array_values($temp);
+
+            // --- STRATEGY 4: Fuzzy Search (sub-keyword matching) ---
+            if (empty($results) && mb_strlen($clean_query) >= 4) {
+                // Split query into overlapping 3-char substrings for fuzzy matching
+                $sub_keywords = [];
+                $qlen = mb_strlen($clean_query);
+                for ($i = 0; $i <= $qlen - 3; $i += 2) {
+                    $sub_keywords[] = mb_substr($clean_query, $i, 3);
+                }
+                $sub_keywords = array_unique($sub_keywords);
+
+                foreach ($sub_keywords as $sk) {
+                    $term = "%$sk%";
+                    $stmt = $pdo->prepare("SELECT id, 'document' as origin, title, content as body FROM documents WHERE (title LIKE ? OR tags LIKE ?) AND status = 'published' ORDER BY views DESC LIMIT 3");
+                    $stmt->execute([$term, $term]);
+                    $results = array_merge($results, $stmt->fetchAll(PDO::FETCH_ASSOC));
+                }
+                // Deduplicate fuzzy results
+                $temp = [];
+                foreach ($results as $r) {
+                    $unique_key = $r['origin'] . '_' . $r['title'];
+                    if (!isset($temp[$unique_key]))
+                        $temp[$unique_key] = $r;
+                }
+                $results = array_values($temp);
+            }
+
             // Limit total results
             $results = array_slice($results, 0, 5);
+
+            // Save first result title to conversation memory for context resolution
+            if (!empty($results)) {
+                $_SESSION['ai_history'][] = ['role' => 'ai_result', 'text' => $results[0]['title'], 'time' => time()];
+            }
 
             if (empty($results)) {
                 $ai_response = "🤔 **ผมพยายามค้นหาข้อมูลเกี่ยวกับ \"$msg\" ในทุกส่วนของระบบแล้ว แต่ไม่พบข้อมูลที่ตรงกันเลยครับ**\n\n" .
                     "**ข้อแนะนำเพิ่มเติม:**\n" .
                     "- ลองใช้คำค้นที่กว้างขึ้น หรือคำที่เกี่ยวข้อง\n" .
+                    "- ลองใช้คำสำคัญเพียง 1-2 คำ เช่น 'การประกันคุณภาพ' แทน 'ขั้นตอนการทำงานประกันคุณภาพ'\n" .
                     "- หากเป็นเอกสารใหม่ อาจจะยังไม่อยู่ในระบบ\n" .
                     "- ลองพิมพ์คำว่า **'ช่วยเหลือ'** เพื่อดูวิธีใช้งานผมได้นะครับ";
             } else {
@@ -421,6 +525,10 @@ if (isset($_POST['ajax_chat'])) {
 
     // Build the Synthesis with Source Links (Standardized)
     if (!empty($results)) {
+        // Save first result to conversation memory for context-aware follow-ups
+        if (!empty($results[0]['title']) && $intent !== 'search') {
+            $_SESSION['ai_history'][] = ['role' => 'ai_result', 'text' => $results[0]['title'], 'time' => time()];
+        }
         foreach ($results as $idx => $res) {
             $origin = $res['origin'] ?? 'document';
             $icon = ($origin == 'expert') ? '👤' : (($origin == 'training') ? '🎓' : (($origin == 'wiki') ? '📘' : '📄'));
@@ -511,7 +619,7 @@ if (isset($_POST['ajax_chat'])) {
             // --- SMART FALLBACK: If no internal results, try Chit-Chat ---
             if (empty($results)) {
                 $msg_chk = $msg_lower;
-                
+
                 // 1. Gratitude
                 if (preg_match('/(ขอบคุณ|thank|thx|ใจมาก|ดีมาก|สุดยอด|เก่ง|good job)/u', $msg_chk)) {
                     $ai_response = "🙏 **ยินดีรับใช้ครับ!**\nหากมีเรื่องอื่นให้ช่วยบอกได้เลยนะครับ ผมพร้อมเสมอครับ 😊";

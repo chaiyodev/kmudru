@@ -27,10 +27,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['question'])) {
     $message = "เพิ่มคำถามเรียบร้อยแล้ว!";
 }
 
-// Handle Delete
-if (isset($_GET['delete'])) {
-    $q_id = (int) $_GET['delete'];
-    $pdo->exec("DELETE FROM quizzes WHERE id = $q_id AND course_id = $course_id");
+// Handle Delete (Secure: POST + CSRF)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_quiz'])) {
+    verify_csrf_token($_POST['csrf_token'] ?? '');
+    $q_id = (int) $_POST['delete_quiz'];
+    $stmt = $pdo->prepare("DELETE FROM quizzes WHERE id = ? AND course_id = ?");
+    $stmt->execute([$q_id, $course_id]);
     header("Location: quiz_editor.php?id=$course_id");
     exit;
 }
@@ -168,9 +170,12 @@ $course = $pdo->query("SELECT title FROM trainings WHERE id = $course_id")->fetc
                                     <?php echo htmlspecialchars($opts['D']); ?>
                                 </li>
                             </ul>
-                            <a href="quiz_editor.php?id=<?php echo $course_id; ?>&delete=<?php echo $q['id']; ?>"
-                                onclick="return confirm('ลบข้อนี้?');"
-                                style="color: #ef4444; font-size: 0.8rem; text-decoration: none;">[ลบคำถาม]</a>
+                            <form method="POST" style="display:inline;" onsubmit="return confirm('ลบข้อนี้?');">
+                                <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
+                                <input type="hidden" name="delete_quiz" value="<?php echo $q['id']; ?>">
+                                <button type="submit"
+                                    style="background:none; border:none; color: #ef4444; font-size: 0.8rem; cursor: pointer; padding: 0;">[ลบคำถาม]</button>
+                            </form>
                         </div>
                     <?php endforeach; ?>
                 </div>

@@ -12,41 +12,79 @@ $message = '';
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
+    verify_csrf_token($_POST['csrf_token'] ?? '');
+
     $title = $_POST['title'];
     $category_id = $_POST['category_id'];
     $description = $_POST['description'];
     $tags = $_POST['tags'];
     $user_id = $_SESSION['user_id'];
 
+    // --- SECURITY: File Upload Validation ---
+    $allowed_extensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'png', 'jpg', 'jpeg', 'gif'];
+    $allowed_mimes = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-powerpoint',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'text/plain',
+        'image/png',
+        'image/jpeg',
+        'image/gif'
+    ];
+    $max_file_size = 10 * 1024 * 1024; // 10 MB
+
     if (isset($_FILES['file']) && $_FILES['file']['error'] === 0) {
-        $upload_dir = 'uploads/';
-        if (!is_dir($upload_dir))
-            mkdir($upload_dir, 0777, true);
+        $original_name = basename($_FILES['file']['name']);
+        $file_ext = strtolower(pathinfo($original_name, PATHINFO_EXTENSION));
+        $file_mime = $_FILES['file']['type'];
+        $file_size = $_FILES['file']['size'];
 
-        $file_name = time() . '_' . basename($_FILES['file']['name']);
-        $target_file = $upload_dir . $file_name;
-
-        if (move_uploaded_file($_FILES['file']['tmp_name'], $target_file)) {
-            try {
-                $pdo->beginTransaction();
-
-                // Insert Document
-                $stmt = $pdo->prepare("INSERT INTO documents (title, content, category_id, user_id, type, tags) VALUES (?, ?, ?, ?, 'document', ?)");
-                $stmt->execute([$title, $description, $category_id, $user_id, $tags]);
-                $doc_id = $pdo->lastInsertId();
-
-                // Insert Attachment
-                $stmt = $pdo->prepare("INSERT INTO attachments (document_id, file_name, file_path, file_type, file_size) VALUES (?, ?, ?, ?, ?)");
-                $stmt->execute([$doc_id, $_FILES['file']['name'], $target_file, $_FILES['file']['type'], $_FILES['file']['size']]);
-
-                $pdo->commit();
-                $message = "อัปโหลดเอกสารเรียบร้อยแล้ว!";
-            } catch (Exception $e) {
-                $pdo->rollBack();
-                $error = "เกิดข้อผิดพลาด: " . $e->getMessage();
-            }
+        // Validate Extension
+        if (!in_array($file_ext, $allowed_extensions)) {
+            $error = "ประเภทไฟล์ไม่อนุญาต (.{$file_ext}) — รองรับเฉพาะ: " . implode(', ', $allowed_extensions);
+        }
+        // Validate MIME type
+        else if (!in_array($file_mime, $allowed_mimes)) {
+            $error = "ประเภท MIME ของไฟล์ไม่ถูกต้อง ({$file_mime})";
+        }
+        // Validate File Size
+        else if ($file_size > $max_file_size) {
+            $error = "ขนาดไฟล์เกินกำหนด (" . round($file_size / 1024 / 1024, 1) . " MB) — จำกัดสูงสุด 10 MB";
         } else {
-            $error = "ไม่สามารถย้ายไฟล์ที่อัปโหลดได้";
+            $upload_dir = 'uploads/';
+            if (!is_dir($upload_dir))
+                mkdir($upload_dir, 0755, true);
+
+            // Secure filename: use unique hash + original extension only
+            $file_name = bin2hex(random_bytes(16)) . '.' . $file_ext;
+            $target_file = $upload_dir . $file_name;
+
+            if (move_uploaded_file($_FILES['file']['tmp_name'], $target_file)) {
+                try {
+                    $pdo->beginTransaction();
+
+                    // Insert Document
+                    $stmt = $pdo->prepare("INSERT INTO documents (title, content, category_id, user_id, type, tags) VALUES (?, ?, ?, ?, 'document', ?)");
+                    $stmt->execute([$title, $description, $category_id, $user_id, $tags]);
+                    $doc_id = $pdo->lastInsertId();
+
+                    // Insert Attachment
+                    $stmt = $pdo->prepare("INSERT INTO attachments (document_id, file_name, file_path, file_type, file_size) VALUES (?, ?, ?, ?, ?)");
+                    $stmt->execute([$doc_id, $original_name, $target_file, $file_mime, $file_size]);
+
+                    $pdo->commit();
+                    $message = "อัปโหลดเอกสารเรียบร้อยแล้ว!";
+                } catch (Exception $e) {
+                    $pdo->rollBack();
+                    $error = "เกิดข้อผิดพลาด: " . $e->getMessage();
+                }
+            } else {
+                $error = "ไม่สามารถย้ายไฟล์ที่อัปโหลดได้";
+            }
         }
     } else {
         $error = "กรุณาเลือกไฟล์ที่ต้องการอัปโหลด";
@@ -179,11 +217,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
 
             <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2.5rem;">
                 <form action="upload.php" method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                     <div id="drop-zone" class="upload-zone">
                         <div class="upload-icon"><i data-lucide="upload-cloud"></i></div>
                         <h3 style="font-weight: 700; margin-bottom: 0.5rem;">คลิกเพื่อเลือกไฟล์ หรือลากมาวางที่นี่</h3>
                         <p style="font-size: 0.8125rem; color: hsl(var(--muted-foreground));">รองรับไฟล์ PDF, Word,
-                            Excel, PPT และไฟล์รูปภาพ (สูงสุด 20MB)</p>
+                            Excel, PPT และไฟล์รูปภาพ (สูงสุด 10MB)</p>
                         <input type="file" name="file" id="file-input" style="display: none;">
                     </div>
 
