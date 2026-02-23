@@ -3,6 +3,7 @@ require_once 'includes/db.php';
 require_once 'includes/auth.php';
 
 $pdo = get_pdo();
+require_login();
 $categories = [];
 if ($pdo) {
     $categories = $pdo->query("SELECT * FROM categories")->fetchAll();

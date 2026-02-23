@@ -4,12 +4,8 @@ require_once 'includes/auth.php';
 require_once 'includes/notifications.php';
 
 $pdo = get_pdo();
-$user_id = is_logged_in() ? $_SESSION['user_id'] : 0;
-
-if (!$user_id) {
-    header("Location: login.php");
-    exit();
-}
+require_login();
+$user_id = $_SESSION['user_id'];
 
 // Mark all as read when viewing this page
 mark_all_read($pdo, $user_id);

@@ -3,17 +3,13 @@ require_once 'includes/db.php';
 require_once 'includes/auth.php';
 
 $pdo = get_pdo();
-$user_id = is_logged_in() ? $_SESSION['user_id'] : 0;
+require_login();
+$user_id = $_SESSION['user_id'];
 $user_data = [];
 
-if ($user_id > 0) {
-    $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
-    $stmt->execute([$user_id]);
-    $user_data = $stmt->fetch();
-} else {
-    header("Location: login.php");
-    exit();
-}
+$stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+$stmt->execute([$user_id]);
+$user_data = $stmt->fetch();
 
 $message = '';
 $error = '';

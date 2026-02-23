@@ -2,13 +2,10 @@
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 
-if (!is_logged_in()) {
-    header("Location: login.php");
-    exit;
-}
+require_login();
+$user_id = $_SESSION['user_id'];
 
 $pdo = get_pdo();
-$user_id = $_SESSION['user_id'];
 $user_info = null;
 $my_docs = [];
 $stats = ['total' => 0, 'views' => 0, 'likes' => 0];

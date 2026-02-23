@@ -2,10 +2,8 @@
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 
-if (!is_logged_in()) {
-    header("Location: login.php");
-    exit;
-}
+require_login();
+$user_id = $_SESSION['user_id'];
 
 $pdo = get_pdo();
 $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
@@ -206,12 +204,12 @@ $page_title = "แก้ไขเนื้อหา: " . htmlspecialchars($doc['
                         <div class="form-group" style="margin-bottom: 1.25rem;">
                             <label class="form-label">สถานะ (Status)</label>
                             <select name="status" class="form-select">
-                                <option value="published" <?php echo $doc['status'] == 'published' ? 'selected' : ''; ?>
-                                    >เผยแพร่ (Published)</option>
+                                <option value="published" <?php echo $doc['status'] == 'published' ? 'selected' : ''; ?>>
+                                    เผยแพร่ (Published)</option>
                                 <option value="draft" <?php echo $doc['status'] == 'draft' ? 'selected' : ''; ?>>ฉบับร่าง
                                     (Draft)</option>
-                                <option value="archived" <?php echo $doc['status'] == 'archived' ? 'selected' : ''; ?>
-                                    >เก็บเข้าคลัง (Archived)</option>
+                                <option value="archived" <?php echo $doc['status'] == 'archived' ? 'selected' : ''; ?>>
+                                    เก็บเข้าคลัง (Archived)</option>
                             </select>
                         </div>
 

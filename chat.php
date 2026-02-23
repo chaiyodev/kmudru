@@ -3,19 +3,16 @@ require_once 'includes/db.php';
 require_once 'includes/auth.php';
 
 $pdo = get_pdo();
-$user_id = is_logged_in() ? $_SESSION['user_id'] : 0;
-
-if (!$user_id) {
-    header("Location: login.php");
-    exit();
-}
+require_login();
+$user_id = $_SESSION['user_id'];
 
 $target_user_id = isset($_GET['user']) ? (int) $_GET['user'] : 0;
 $users = $pdo->query("SELECT id, username, full_name FROM users WHERE id != $user_id")->fetchAll();
 
 $messages = [];
 if ($target_user_id > 0) {
-    $stmt = $pdo->prepare("SELECT * FROM chat_messages WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?) ORDER BY created_at ASC");
+    $stmt = $pdo->prepare("SELECT * FROM chat_messages WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND
+receiver_id = ?) ORDER BY created_at ASC");
     $stmt->execute([$user_id, $target_user_id, $target_user_id, $user_id]);
     $messages = $stmt->fetchAll();
 }

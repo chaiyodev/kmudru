@@ -6,10 +6,7 @@ $pdo = get_pdo();
 $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 $tab = isset($_GET['tab']) ? $_GET['tab'] : ($id > 0 ? 'lessons' : 'basic');
 
-if (!is_logged_in()) {
-    header("Location: login.php");
-    exit;
-}
+require_login();
 
 $categories = [];
 if ($pdo) {
