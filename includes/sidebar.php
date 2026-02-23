@@ -3,6 +3,7 @@
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/logger.php';
+require_once __DIR__ . '/notifications.php';
 
 $sidebar_pdo = get_pdo();
 $doc_count = $sidebar_pdo->query("SELECT COUNT(*) FROM documents")->fetchColumn();
@@ -13,10 +14,15 @@ track_visitor($current_page);
 
 // Fetch current user data for profile card
 $sidebar_user = null;
+$unread_notifications = 0;
 if (is_logged_in()) {
-    $stmt = $sidebar_pdo->prepare("SELECT avatar FROM users WHERE id = ?");
+    $stmt = $sidebar_pdo->prepare("SELECT id, avatar FROM users WHERE id = ?");
     $stmt->execute([$_SESSION['user_id']]);
     $sidebar_user = $stmt->fetch();
+
+    if ($sidebar_user) {
+        $unread_notifications = get_unread_count($sidebar_pdo, $sidebar_user['id']);
+    }
 }
 ?>
 <aside class="sidebar" id="main-sidebar" style="height: 100dvh; display: flex; flex-direction: column;">
@@ -44,6 +50,15 @@ if (is_logged_in()) {
             <a href="chat.php" class="nav-link <?php echo $current_page == 'chat.php' ? 'active' : ''; ?>">
                 <i data-lucide="message-square"></i>
                 <span>กล่องข้อความ</span>
+            </a>
+            <a href="notifications.php"
+                class="nav-link <?php echo $current_page == 'notifications.php' ? 'active' : ''; ?>">
+                <i data-lucide="bell"></i>
+                <span>การแจ้งเตือน</span>
+                <?php if ($unread_notifications > 0): ?>
+                    <span class="nav-pill"
+                        style="background: #ef4444; color: white;"><?php echo $unread_notifications; ?></span>
+                <?php endif; ?>
             </a>
             <a href="ai_assistant.php"
                 class="nav-link <?php echo $current_page == 'ai_assistant.php' ? 'active' : ''; ?>">
@@ -103,7 +118,7 @@ if (is_logged_in()) {
                     style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; overflow: hidden;">
                     <?php
                     $avatar_url = !empty($sidebar_user['avatar']) ? 'uploads/avatars/' . $sidebar_user['avatar'] : '';
-                    $full_path = 'c:/xampp/htdocs/kmudru/' . $avatar_url;
+                    $full_path = 'c:/xampp/htdocs/udruwisdom/' . $avatar_url;
                     $has_avatar = !empty($avatar_url) && file_exists($full_path);
                     $initials = strtoupper(substr($_SESSION['username'] ?? 'U', 0, 1));
                     ?>

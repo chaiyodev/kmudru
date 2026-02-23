@@ -59,6 +59,11 @@ if ($id > 0 && $pdo) {
     $comments_stmt = $pdo->prepare("SELECT c.*, u.full_name, u.username FROM comments c JOIN users u ON c.user_id = u.id WHERE c.document_id = ? ORDER BY c.created_at DESC");
     $comments_stmt->execute([$id]);
     $comments = $comments_stmt->fetchAll();
+
+    // Fetch Attachments
+    $attachments_stmt = $pdo->prepare("SELECT * FROM attachments WHERE document_id = ?");
+    $attachments_stmt->execute([$id]);
+    $attachments = $attachments_stmt->fetchAll();
 }
 
 if (!$doc) {
@@ -103,7 +108,55 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
             padding: 2rem;
             text-align: center;
         }
+
+        .attachment-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: hsl(var(--muted)/0.3);
+            border: 1px solid var(--border-color);
+            padding: 1rem 1.5rem;
+            border-radius: 1rem;
+            margin-bottom: 0.75rem;
+            transition: var(--transition-base);
+        }
+
+        .attachment-item:hover {
+            background: hsl(var(--primary)/0.05);
+            border-color: var(--teal-primary);
+        }
+
+        .file-icon {
+            width: 40px;
+            height: 40px;
+            background: white;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--teal-primary);
+            flex-shrink: 0;
+        }
     </style>
+    <script>
+        function getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const MAP = {
+                'pdf': 'file-text',
+                'doc': 'file-code',
+                'docx': 'file-code',
+                'xls': 'file-spreadsheet',
+                'xlsx': 'file-spreadsheet',
+                'ppt': 'presentation',
+                'pptx': 'presentation',
+                'jpg': 'image',
+                'jpeg': 'image',
+                'png': 'image',
+                'zip': 'archive'
+            };
+            return MAP[ext] || 'file';
+        }
+    </script>
 </head>
 
 <body>
@@ -151,6 +204,57 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                         </div>
 
                         <div class="article-content"><?php echo nl2br(htmlspecialchars($doc['content'])); ?></div>
+
+                        <?php if (!empty($attachments)): ?>
+                            <div style="margin-top: 3rem;">
+                                <h3
+                                    style="font-size: 1.125rem; font-weight: 800; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                                    <i data-lucide="paperclip" style="color: var(--teal-primary);"></i> เอกสารแนบ
+                                    (<?php echo count($attachments); ?>)
+                                </h3>
+                                <div class="attachments-list">
+                                    <?php foreach ($attachments as $file): ?>
+                                        <?php
+                                        $ext = strtolower(pathinfo($file['file_name'], PATHINFO_EXTENSION));
+                                        $icon = 'file';
+                                        if (in_array($ext, ['pdf']))
+                                            $icon = 'file-text';
+                                        if (in_array($ext, ['doc', 'docx']))
+                                            $icon = 'file-box';
+                                        if (in_array($ext, ['xls', 'xlsx']))
+                                            $icon = 'table-2';
+                                        if (in_array($ext, ['ppt', 'pptx']))
+                                            $icon = 'presentation';
+                                        if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif']))
+                                            $icon = 'image';
+                                        ?>
+                                        <div class="attachment-item">
+                                            <div style="display: flex; align-items: center; gap: 1rem; overflow: hidden;">
+                                                <div class="file-icon">
+                                                    <i data-lucide="<?php echo $icon; ?>"></i>
+                                                </div>
+                                                <div style="overflow: hidden;">
+                                                    <div style="font-weight: 700; font-size: 0.9375rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                                                        title="<?php echo htmlspecialchars($file['file_name']); ?>">
+                                                        <?php echo htmlspecialchars($file['file_name']); ?>
+                                                    </div>
+                                                    <div style="font-size: 0.75rem; color: hsl(var(--muted-foreground));">
+                                                        <?php echo strtoupper($ext); ?> •
+                                                        <?php echo round($file['file_size'] / 1024, 1); ?> KB
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <a href="<?php echo htmlspecialchars($file['file_path']); ?>"
+                                                download="<?php echo htmlspecialchars($file['file_name']); ?>"
+                                                class="btn-primary"
+                                                style="padding: 0.5rem 1rem; font-size: 0.8125rem; border-radius: 0.75rem;">
+                                                <i data-lucide="download" style="width: 14px; height: 14px;"></i> ดาวน์โหลด
+                                            </a>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        <?php endif; ?>
 
                         <div
                             style="display: flex; gap: 0.75rem; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border-color);">

@@ -125,6 +125,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
     }
 }
 
+// Fetch counts for badges (Regardless of active tab)
+$post_count = $pdo->prepare("SELECT COUNT(*) FROM community_posts WHERE community_id = ?");
+$post_count->execute([$id]);
+$total_posts = $post_count->fetchColumn();
+
+$res_count = $pdo->prepare("SELECT COUNT(*) FROM community_resources WHERE community_id = ?");
+$res_count->execute([$id]);
+$total_resources = $res_count->fetchColumn();
+
+$mem_count = $pdo->prepare("SELECT COUNT(*) FROM community_members WHERE community_id = ?");
+$mem_count->execute([$id]);
+$total_members = $mem_count->fetchColumn();
+
 // Fetch Tab-specific Data
 $posts = [];
 $members = [];
@@ -470,7 +483,7 @@ if ($tab === 'discussions') {
                             <div style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="users"
                                     style="width: 16px;"></i>
                                 <strong>
-                                    <?php echo $cop['member_count']; ?>
+                                    <?php echo $total_members; ?>
                                 </strong> สมาชิก
                             </div>
                             <div style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="calendar"
@@ -524,11 +537,11 @@ if ($tab === 'discussions') {
                     <!-- Side Widget in Banner (Fills empty space) -->
                     <div class="quick-stat-box animate-fade-in">
                         <div class="stat-item">
-                            <span class="val"><?php echo count($posts); ?></span>
+                            <span class="val"><?php echo $total_posts; ?></span>
                             <span class="lbl">กระทู้ทั้งหมด</span>
                         </div>
                         <div class="stat-item">
-                            <span class="val"><?php echo count($resources); ?></span>
+                            <span class="val"><?php echo $total_resources; ?></span>
                             <span class="lbl">การแชร์ทรัพยากร</span>
                         </div>
                         <div
@@ -546,19 +559,19 @@ if ($tab === 'discussions') {
                     class="tab-btn <?php echo $tab == 'discussions' ? 'active' : ''; ?>">
                     <i data-lucide="message-square" style="width: 18px;"></i> การสนทนา
                     <span
-                        style="font-size: 0.7rem; background: #f1f5f9; padding: 2px 6px; border-radius: 6px; margin-left: 0.5rem; color: #64748b;"><?php echo count($posts); ?></span>
+                        style="font-size: 0.7rem; background: #f1f5f9; padding: 2px 6px; border-radius: 6px; margin-left: 0.5rem; color: #64748b;"><?php echo $total_posts; ?></span>
                 </a>
                 <a href="?id=<?php echo $id; ?>&tab=resources"
                     class="tab-btn <?php echo $tab == 'resources' ? 'active' : ''; ?>">
                     <i data-lucide="library" style="width: 18px;"></i> ทรัพยากร
                     <span
-                        style="font-size: 0.7rem; background: #f1f5f9; padding: 2px 6px; border-radius: 6px; margin-left: 0.5rem; color: #64748b;"><?php echo count($resources); ?></span>
+                        style="font-size: 0.7rem; background: #f1f5f9; padding: 2px 6px; border-radius: 6px; margin-left: 0.5rem; color: #64748b;"><?php echo $total_resources; ?></span>
                 </a>
                 <a href="?id=<?php echo $id; ?>&tab=members"
                     class="tab-btn <?php echo $tab == 'members' ? 'active' : ''; ?>">
                     <i data-lucide="users-2" style="width: 18px;"></i> สมาชิก
                     <span
-                        style="font-size: 0.7rem; background: #f1f5f9; padding: 2px 6px; border-radius: 6px; margin-left: 0.5rem; color: #64748b;"><?php echo count($members); ?></span>
+                        style="font-size: 0.7rem; background: #f1f5f9; padding: 2px 6px; border-radius: 6px; margin-left: 0.5rem; color: #64748b;"><?php echo $total_members; ?></span>
                 </a>
             </nav>
 

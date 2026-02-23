@@ -30,7 +30,7 @@ if ($user) {
     echo "User 'admin' not found. Creating it now...<br>";
 
     // 3. Create if not exists
-    $insert = $pdo->prepare("INSERT INTO users (username, password, full_name, email, role) VALUES (?, ?, 'System Administrator', 'admin@kmud.ubru.ac.th', 'admin')");
+    $insert = $pdo->prepare("INSERT INTO users (username, password, full_name, email, role) VALUES (?, ?, 'System Administrator', 'admin@udruwisdom.udru.ac.th', 'admin')");
     if ($insert->execute([$username, $hash])) {
         echo "<h3 style='color: green;'>✅ Admin User Created!</h3>";
         echo "User: <b>admin</b><br>";

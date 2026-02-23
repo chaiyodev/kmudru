@@ -56,7 +56,7 @@ if ($pdo) {
             FROM trainings t
             LEFT JOIN categories c ON t.category_id = c.id)
             ORDER BY created_at DESC 
-            LIMIT 4";
+            LIMIT 6";
         $latest_docs = $pdo->query($doc_query)->fetchAll();
 
         // Update type labels for display
@@ -287,6 +287,33 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
             .main-viewport {
                 padding: 1.25rem !important;
             }
+
+            .main-content-grid {
+                grid-template-columns: 1fr !important;
+                gap: 1.5rem !important;
+            }
+
+            .ai-smart-card {
+                padding: 1.25rem !important;
+            }
+
+            .ai-smart-card h4 {
+                font-size: 0.95rem !important;
+            }
+
+            .ai-smart-card p {
+                font-size: 0.75rem !important;
+                line-height: 1.4 !important;
+            }
+
+            /* Fix tag-badge wrapping */
+            .tag-badge {
+                max-width: 100%;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                display: inline-block;
+            }
         }
     </style>
 </head>
@@ -465,7 +492,7 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
 
                 <aside>
                     <!-- AI Smart Hub Widget -->
-                    <div
+                    <div class="ai-smart-card"
                         style="background: linear-gradient(135deg, #14b8a6 0%, #0ea5e9 100%); padding: 1.5rem; border-radius: 1rem; color: white; margin-bottom: 2rem; position: relative; overflow: hidden; box-shadow: 0 10px 25px rgba(20, 184, 166, 0.3);">
                         <i data-lucide="sparkles"
                             style="position: absolute; right: -10px; top: -10px; width: 60px; height: 60px; opacity: 0.2;"></i>

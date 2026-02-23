@@ -4,7 +4,7 @@
 // DO NOT commit your real Client Secret to version control
 define('GOOGLE_CLIENT_ID', 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com');
 define('GOOGLE_CLIENT_SECRET', 'YOUR_GOOGLE_CLIENT_SECRET');
-define('GOOGLE_REDIRECT_URL', 'http://localhost/kmudru/auth_google.php');
+define('GOOGLE_REDIRECT_URL', 'http://localhost:8080/udruwisdom/auth_google.php');
 
 // Permissions (Scopes)
 $google_scopes = [

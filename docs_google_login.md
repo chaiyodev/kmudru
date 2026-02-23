@@ -36,7 +36,7 @@
 - **Name**: `UDRU Wisdom Web Client`
 - **Authorized redirect URIs** (สำคัญมาก): 
     - กด **+ ADD URI**
-    - สำหรับเครื่องตัวเอง (Local): `http://localhost:8080/kmudru/auth_google.php`
+    - สำหรับเครื่องตัวเอง (Local): `http://localhost:8080/udruwisdom/auth_google.php`
     - สำหรับเซิร์ฟเวอร์จริง: `https://your-domain.com/auth_google.php`
 - กด **CREATE** และคัดลอกค่า **Client ID** และ **Client Secret** ไว้
 
@@ -53,7 +53,7 @@ define('GOOGLE_CLIENT_ID', 'ใส่_Client_ID_ที่ได้จาก_Goog
 define('GOOGLE_CLIENT_SECRET', 'ใส่_Client_Secret_ที่ได้จาก_Google_ตรงนี้');
 
 // เมื่อขึ้น Server จริง ต้องเปลี่ยน URL นี้ให้ตรงกับความเป็นจริง
-define('GOOGLE_REDIRECT_URL', 'http://localhost:8080/kmudru/auth_google.php');
+define('GOOGLE_REDIRECT_URL', 'http://localhost:8080/udruwisdom/auth_google.php');
 ?>
 ```
 

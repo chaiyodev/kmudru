@@ -4,7 +4,7 @@
  * Rename this file to db.php and update the values below.
  */
 $host = 'localhost';
-$db = 'kmud_db';
+$db = 'udruwisdom_db';
 $user = 'root'; // Default XAMPP user
 $pass = '';     // Default XAMPP password
 $charset = 'utf8mb4';

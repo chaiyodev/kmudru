@@ -1,5 +1,5 @@
-CREATE DATABASE IF NOT EXISTS kmud_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE kmud_db;
+CREATE DATABASE IF NOT EXISTS udruwisdom_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE udruwisdom_db;
 
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -65,4 +65,4 @@ INSERT IGNORE INTO categories (name, description, icon) VALUES
 -- Insert default admin (password: admin123)
 -- Password Hash: $2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi
 INSERT IGNORE INTO users (username, password, full_name, email, role) VALUES 
-('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'System Administrator', 'admin@kmud.ubru.ac.th', 'admin');
+('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'System Administrator', 'admin@udruwisdom.udru.ac.th', 'admin');

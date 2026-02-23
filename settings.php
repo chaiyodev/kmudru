@@ -16,18 +16,48 @@ $user_data = $stmt->fetch();
 
 $message = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $full_name = $_POST['full_name'];
-    $email = $_POST['email'];
-    $dept = $_POST['department'];
+    if (isset($_POST['update_profile'])) {
+        $full_name = $_POST['full_name'];
+        $email = $_POST['email'];
+        $dept = $_POST['department'];
 
-    try {
-        $stmt = $pdo->prepare("UPDATE users SET full_name = ?, email = ?, department = ? WHERE id = ?");
-        $stmt->execute([$full_name, $email, $dept, $user_id]);
-        $message = "บันทึกการตั้งค่าเรียบร้อยแล้ว!";
-    } catch (PDOException $e) {
-        $message = "Error: " . $e->getMessage();
+        try {
+            $stmt = $pdo->prepare("UPDATE users SET full_name = ?, email = ?, department = ? WHERE id = ?");
+            $stmt->execute([$full_name, $email, $dept, $user_id]);
+            $message = "บันทึกข้อมูลส่วนตัวเรียบร้อยแล้ว!";
+            // Update local data
+            $user_data['full_name'] = $full_name;
+            $user_data['email'] = $email;
+            $user_data['department'] = $dept;
+        } catch (PDOException $e) {
+            $message = "Error: " . $e->getMessage();
+        }
+    } elseif (isset($_POST['update_notifications'])) {
+        $prefs = [
+            'new_content' => isset($_POST['new_content']) ? 1 : 0,
+            'comments' => isset($_POST['comments']) ? 1 : 0,
+            'questions' => isset($_POST['questions']) ? 1 : 0,
+            'system' => isset($_POST['system']) ? 1 : 0
+        ];
+        $json_prefs = json_encode($prefs);
+        try {
+            $stmt = $pdo->prepare("UPDATE users SET email_prefs = ? WHERE id = ?");
+            $stmt->execute([$json_prefs, $user_id]);
+            $message = "บันทึกการตั้งค่าการแจ้งเตือนเรียบร้อยแล้ว!";
+            $user_data['email_prefs'] = $json_prefs;
+        } catch (PDOException $e) {
+            $message = "Error: " . $e->getMessage();
+        }
     }
 }
+
+// Parse current preferences
+$prefs = json_decode($user_data['email_prefs'] ?? '{}', true);
+// Default values (Opt-in logic for new content, Opt-out for basic interaction)
+$prefs_new_content = isset($prefs['new_content']) ? $prefs['new_content'] : 0;
+$prefs_comments = isset($prefs['comments']) ? $prefs['comments'] : 1;
+$prefs_questions = isset($prefs['questions']) ? $prefs['questions'] : 1;
+$prefs_system = isset($prefs['system']) ? $prefs['system'] : 1;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -241,6 +271,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <section id="section-profile">
                         <h3 class="settings-section-title"><i data-lucide="user"></i> ข้อมูลส่วนตัว</h3>
                         <form id="profile-form" action="settings.php" method="POST">
+                            <input type="hidden" name="update_profile" value="1">
                             <div class="form-group">
                                 <label class="form-label">ชื่อ-นามสกุล</label>
                                 <input type="text" name="full_name" class="form-input"
@@ -265,23 +296,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     <!-- Notifications Section -->
                     <section id="section-notifications" style="display: none;">
-                        <h3 class="settings-section-title"><i data-lucide="bell"></i> ตั้งค่าการแจ้งเตือน</h3>
-                        <div class="toggle-group">
-                            <div class="toggle-info">
-                                <h4>อีเมลแจ้งเตือน (Email Notifications)</h4>
-                                <p>รับอีเมลเมื่อมีบทความใหม่หรือคำถามที่ตรงกับความเชี่ยวชาญ</p>
+                        <h3 class="settings-section-title"><i data-lucide="bell"></i> ตั้งค่าการแจ้งเตือน (Email Opt-in)
+                        </h3>
+                        <form action="settings.php" method="POST">
+                            <input type="hidden" name="update_notifications" value="1">
+
+                            <div class="toggle-group">
+                                <div class="toggle-info">
+                                    <h4>แจ้งเตือนข้อมูลใหม่ (New Content)</h4>
+                                    <p>รับอีเมลเมื่อมีการอัปโหลดเอกสารใหม่ หรือสร้าง Wiki ใหม่ในระบบ</p>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" name="new_content" <?php echo $prefs_new_content ? 'checked' : ''; ?>>
+                                    <span class="slider"></span>
+                                </label>
                             </div>
-                            <label class="switch"><input type="checkbox" checked
-                                    onchange="notifyChange('Email Notifications')"><span class="slider"></span></label>
-                        </div>
-                        <div class="toggle-group">
-                            <div class="toggle-info">
-                                <h4>การแจ้งเตือนในระบบ (System Alerts)</h4>
-                                <p>แสดงจุดแจ้งเตือนเมื่อมีคนมาคอมเมนต์หรือกดไลก์</p>
+
+                            <div class="toggle-group">
+                                <div class="toggle-info">
+                                    <h4>ความคิดเห็น (Comments)</h4>
+                                    <p>รับอีเมลเมื่อมีคนแสดงความคิดเห็นในเนื้อหาที่คุณเป็นเจ้าของ</p>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" name="comments" <?php echo $prefs_comments ? 'checked' : ''; ?>>
+                                    <span class="slider"></span>
+                                </label>
                             </div>
-                            <label class="switch"><input type="checkbox" checked
-                                    onchange="notifyChange('System Alerts')"><span class="slider"></span></label>
-                        </div>
+
+                            <div class="toggle-group">
+                                <div class="toggle-info">
+                                    <h4>ข้อซักถาม (Questions & Answers)</h4>
+                                    <p>รับอีเมลเมื่อมีคนตั้งคำถามใหม่ หรือตอบคำถามที่คุณติดตาม</p>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" name="questions" <?php echo $prefs_questions ? 'checked' : ''; ?>>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+
+                            <div class="toggle-group">
+                                <div class="toggle-info">
+                                    <h4>ระบบและข่าวสาร (System News)</h4>
+                                    <p>รับอีเมลเกี่ยวกับกิจกรรมระบบ การแจ้งเตือนความปลอดภัย และข่าวสาร</p>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" name="system" <?php echo $prefs_system ? 'checked' : ''; ?>>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+
+                            <button type="submit" class="btn-primary"
+                                style="margin-top: 2rem;">บันทึกการเลือกรับข้อมูล</button>
+                        </form>
                     </section>
 
                     <!-- Security Section -->
