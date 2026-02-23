@@ -258,7 +258,7 @@ $prefs_system = isset($prefs['system']) ? $prefs['system'] : 1;
                         style="margin-top: auto; padding: 1rem; background: hsl(var(--primary)/0.05); border-radius: 0.75rem; font-size: 0.75rem; color: var(--teal-primary);">
                         <i data-lucide="info"
                             style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i>
-                        เวอร์ชันระบบ 1.1.0 (PRO)
+                        เวอร์ชันระบบ prapakorn1.1.0
                     </div>
                 </aside>
 

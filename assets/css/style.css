@@ -68,66 +68,319 @@ body {
     z-index: 100;
     display: flex;
     flex-direction: column;
-    padding: 1rem 0.75rem;
-    transition: width 0.3s ease, padding 0.3s ease;
+    padding: 0;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
+    height: 100dvh;
+    /* Unified height */
+}
+
+/* Initial Collapse State via JS class on HTML */
+html.sidebar-collapsed-init .sidebar {
+    width: var(--sidebar-collapsed-width);
+}
+
+html.sidebar-collapsed-init .brand-info,
+html.sidebar-collapsed-init .nav-label,
+html.sidebar-collapsed-init .nav-link span:not(.nav-pill-icon),
+html.sidebar-collapsed-init .nav-pill,
+html.sidebar-collapsed-init .sidebar-toggle span {
+    display: none;
 }
 
 .sidebar-nav-container {
     flex: 1;
-    overflow-y: hidden;
-    /* Force total visibility without scroll */
+    overflow-y: auto;
     overflow-x: hidden;
-    margin: 0.25rem 0;
+    padding: 0.75rem 0.75rem;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }
 
+.sidebar-nav-container::-webkit-scrollbar {
+    width: 4px;
+}
+
+.sidebar-nav-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar-nav-container::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+
+.sidebar-nav-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+
+
 .sidebar-footer {
-    margin-top: auto;
-    padding-top: 0.5rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 0.5rem 0.75rem 1rem;
+    background: rgba(0, 0, 0, 0.15);
+    /* Slightly darker to distinguish */
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 10;
 }
 
 /* Collapsed Sidebar State */
 .sidebar.collapsed {
     width: var(--sidebar-collapsed-width);
-    padding: 1.5rem 0.5rem;
+    padding: 0;
+    /* Changed from 1.5rem 0.5rem to 0 for stability */
+}
+
+.sidebar.collapsed .nav-group {
+    margin-bottom: 0.5rem;
 }
 
 .sidebar.collapsed .brand-info,
 .sidebar.collapsed .nav-label,
-.sidebar.collapsed .nav-link span:not(.nav-pill-icon),
-.sidebar.collapsed .nav-pill {
-    display: none;
+.sidebar.collapsed .nav-link span,
+.sidebar.collapsed .nav-pill,
+.sidebar.collapsed .sidebar-toggle span,
+.sidebar.collapsed .profile-name,
+.sidebar.collapsed .role-badge,
+.sidebar.collapsed .profile-actions {
+    display: none !important;
+}
+
+/* Guaranteed Zero-Impact Icons in Collapsed Mode */
+.sidebar.collapsed .nav-link i,
+.sidebar.collapsed .nav-link svg {
+    width: 26px !important;
+    height: 26px !important;
+    stroke-width: 2.3 !important;
+    position: absolute !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    margin: 0 !important;
+    display: block !important;
+    color: rgba(255, 255, 255, 0.72) !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Strictly hide text elements with zero layout footprint */
+.sidebar.collapsed .nav-link span,
+.sidebar.collapsed .nav-link .nav-pill {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    opacity: 0 !important;
+    position: absolute !important;
+}
+
+.sidebar.collapsed .nav-link:hover i,
+.sidebar.collapsed .nav-link:hover svg {
+    color: #ffffff !important;
+    transform: translate(-50%, -50%) scale(1.1) !important;
 }
 
 .sidebar.collapsed .nav-link {
+    width: 44px !important;
+    height: 44px !important;
+    margin: 4px auto !important;
+    /* Adjusted for compact sync */
+    border-radius: 12px !important;
+    display: block !important;
+    padding: 0 !important;
+    position: relative !important;
+    background-color: transparent !important;
+    border: none !important;
+    transition: all 0.2s ease;
+    overflow: visible !important;
+}
+
+.sidebar.collapsed .nav-link:hover:not(.active) {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar.collapsed .profile-info,
+.sidebar.collapsed .profile-actions,
+.sidebar.collapsed .user-profile-card .profile-main-info+div {
+    display: none !important;
+}
+
+.sidebar.collapsed .user-profile-card {
+    padding: 0.5rem 0 !important;
+    display: block !important;
+    background: transparent !important;
+}
+
+.user-profile-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 0.65rem;
+    margin: 0.5rem 0.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.profile-main-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+    overflow: hidden;
+}
+
+.profile-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
     justify-content: center;
-    padding: 0.75rem;
+    background-color: var(--teal-primary);
+    background-size: cover;
+    background-position: center;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.profile-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.875rem;
+    line-height: 1.2;
+}
+
+.role-badge {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-top: 2px;
+}
+
+.profile-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.profile-actions .btn-sm {
+    text-align: center;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 0.35rem;
+    font-size: 0.75rem;
+    color: white;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.profile-actions .btn-sm:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.profile-actions .btn-sm.logout:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #fca5a5;
+}
+
+.sidebar.collapsed .profile-main-info {
+    width: 44px !important;
+    height: 44px !important;
+    margin: 4px auto !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.sidebar.collapsed .profile-avatar {
+    width: 32px !important;
+    /* Slightly larger for avatar is okay, but container must match */
+    height: 32px !important;
+    margin: 0 !important;
+}
+
+.sidebar.collapsed .brand-icon {
+    width: 44px !important;
+    height: 44px !important;
+    background: var(--teal-primary) !important;
+    border-radius: 12px !important;
+    margin: 4px auto !important;
+    /* Unified compact Margin */
+    display: block !important;
+    position: relative !important;
+    box-shadow: 0 4px 12px rgba(20, 184, 166, 0.2);
+}
+
+.sidebar.collapsed .brand-icon i,
+.sidebar.collapsed .brand-icon svg {
+    position: absolute !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 26px !important;
+    height: 26px !important;
+    color: white !important;
 }
 
 .sidebar.collapsed .sidebar-brand {
-    justify-content: center;
-    padding-bottom: 1.5rem;
+    justify-content: center !important;
+    padding: 10px 0 !important;
+    /* Standardized Padding */
 }
 
 /* Sidebar Toggle Button */
 .sidebar-toggle {
-    margin-top: 0.5rem;
-    padding: 0.75rem;
+    margin-top: auto;
+    margin-bottom: 0px;
+    padding: 0.75rem 1.5rem;
     background: rgba(255, 255, 255, 0.05);
     border: none;
-    border-radius: 0.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
     color: rgba(255, 255, 255, 0.82);
     cursor: pointer;
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    font-size: 0.8125rem;
-    font-weight: 600;
+    justify-content: flex-start;
+    gap: 0.75rem;
+    font-size: 0.9375rem;
+    font-weight: 700;
     font-family: inherit;
     transition: var(--transition-base);
     width: 100%;
+}
+
+.sidebar.collapsed .sidebar-toggle {
+    width: 44px !important;
+    height: 44px !important;
+    margin: 4px auto !important;
+    /* Unified compact Margin */
+    border-radius: 12px !important;
+    background: rgba(255, 255, 255, 0.18) !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    padding: 0 !important;
+    justify-content: center !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+.sidebar-toggle i {
+    width: 26px;
+    height: 26px;
+    stroke-width: 2.3;
+}
+
+.sidebar.collapsed .sidebar-toggle i,
+.sidebar.collapsed .sidebar-toggle svg {
+    width: 26px !important;
+    height: 26px !important;
+    stroke-width: 2.3 !important;
 }
 
 .sidebar-toggle:hover {
@@ -140,10 +393,11 @@ body {
 }
 
 .sidebar-brand {
-    padding: 0.25rem 0.25rem 0.75rem;
+    padding: 1.25rem 0.75rem 0.75rem;
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    background: rgba(0, 0, 0, 0.05);
 }
 
 .brand-icon {
@@ -158,27 +412,28 @@ body {
 }
 
 .brand-info h1 {
-    font-size: 1.125rem;
-    font-weight: 700;
-    color: white;
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #ffffff !important;
     letter-spacing: -0.025em;
+    line-height: 1.2;
 }
 
 .brand-info span {
     font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.5) !important;
     font-weight: 500;
 }
 
 .nav-group {
-    margin-bottom: 1.25rem;
+    margin-bottom: 0.5rem;
 }
 
 .nav-label {
-    padding: 0 0.75rem 0.45rem;
-    font-size: 0.65rem;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.35);
+    padding: 0 0.875rem 0.25rem;
+    font-size: 0.625rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.3);
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
@@ -187,13 +442,16 @@ body {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    padding: 0.5rem 0.75rem;
-    color: rgba(255, 255, 255, 0.6);
+    padding: 0.55rem 0.875rem;
+    color: rgba(255, 255, 255, 0.62);
     text-decoration: none;
-    font-size: 0.85rem;
-    font-weight: 500;
-    border-radius: 0.625rem;
-    transition: var(--transition-base);
+    font-size: 0.875rem;
+    font-weight: 600;
+    border-radius: 10px;
+    transition: all 0.2s ease;
+    min-height: 40px;
+    position: relative;
+    user-select: none;
 }
 
 .nav-link i {
@@ -210,17 +468,20 @@ body {
 .nav-link.active {
     background-color: var(--teal-primary);
     color: white;
-    font-weight: 600;
-    box-shadow: 0 4px 12px rgba(20, 184, 166, 0.25);
+    font-weight: 700;
+    box-shadow: 0 8px 20px rgba(20, 184, 166, 0.4);
 }
 
 .nav-pill {
-    margin-left: auto;
+    background: rgba(255, 255, 255, 0.12);
+    color: white;
+    padding: 0.1rem 0.6rem;
+    border-radius: 9999px;
     font-size: 0.7rem;
-    background: rgba(255, 255, 255, 0.1);
-    padding: 1px 6px;
-    border-radius: 999px;
-    color: rgba(255, 255, 255, 0.7);
+    font-weight: 800;
+    margin-left: auto;
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* Main Content Wrapper */
@@ -727,36 +988,7 @@ body.sidebar-collapsed .main-viewport {
     font-weight: 700 !important;
 }
 
-.sidebar.collapsed .user-profile-card {
-    padding: 0.25rem 0;
-    margin-bottom: 0.25rem;
-    border: none;
-    background: transparent !important;
-    box-shadow: none !important;
-}
-
-.sidebar.collapsed .profile-info,
-.sidebar.collapsed .profile-actions,
-.sidebar.collapsed .profile-main-info+.profile-actions {
-    display: none !important;
-}
-
-.sidebar.collapsed .profile-main-info {
-    justify-content: center;
-}
-
-.sidebar.collapsed .profile-avatar {
-    margin: 0;
-    display: flex !important;
-    background-color: var(--teal-primary) !important;
-    color: white !important;
-    border-radius: 10px;
-    width: 40px !important;
-    height: 40px !important;
-    font-size: 1rem;
-    box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
-    border: 2px solid rgba(255, 255, 255, 0.1);
-}
+/* Combined duplications into top rules */
 
 /* Mobile Responsive Global Overrides */
 @media (max-width: 1024px) {

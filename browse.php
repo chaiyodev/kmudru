@@ -9,6 +9,13 @@ $cat_id = isset($_GET['cat_id']) ? (int) $_GET['cat_id'] : 0;
 $docs = [];
 $stats = ['document' => 0, 'wiki' => 0, 'qa' => 0, 'total' => 0];
 
+// Pagination Settings
+$limit = 12;
+$page = isset($_GET['page']) ? (int) $_GET['page'] : 1;
+if ($page < 1)
+    $page = 1;
+$offset = ($page - 1) * $limit;
+
 if ($pdo) {
     // Fetch counts for sidebar
     $count_stmt = $pdo->query("SELECT type, COUNT(*) as count FROM documents GROUP BY type");
@@ -42,7 +49,21 @@ if ($pdo) {
         $params[] = $cat_id;
     }
 
-    $query .= " ORDER BY d.created_at DESC";
+    // For Count Query
+    $count_sql = "SELECT COUNT(*) FROM documents d WHERE 1=1";
+    if (!empty($search))
+        $count_sql .= " AND (d.title LIKE ? OR d.content LIKE ?)";
+    if (!empty($type))
+        $count_sql .= " AND d.type = ?";
+    if ($cat_id > 0)
+        $count_sql .= " AND d.category_id = ?";
+
+    $count_stmt = $pdo->prepare($count_sql);
+    $count_stmt->execute($params);
+    $total_records = $count_stmt->fetchColumn();
+    $total_pages = ceil($total_records / $limit);
+
+    $query .= " ORDER BY d.created_at DESC LIMIT $limit OFFSET $offset";
     $stmt = $pdo->prepare($query);
     $stmt->execute($params);
     $docs = $stmt->fetchAll();
@@ -149,6 +170,50 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                         </div>
                     <?php endforeach; ?>
                 </div>
+
+                <!-- Pagination UI -->
+                <?php if ($total_pages > 1): ?>
+                    <div class="pagination-container"
+                        style="margin-top: 3rem; display: flex; justify-content: center; align-items: center; gap: 0.5rem;">
+                        <?php if ($page > 1): ?>
+                            <a href="?page=<?php echo $page - 1; ?>&search=<?php echo urlencode($search); ?>&type=<?php echo urlencode($type); ?>&cat_id=<?php echo $cat_id; ?>"
+                                style="padding: 0.75rem; border-radius: 12px; border: 1px solid var(--border-color); background: white; color: var(--teal-primary); display: flex; align-items: center; justify-content: center;">
+                                <i data-lucide="chevron-left"></i>
+                            </a>
+                        <?php endif; ?>
+
+                        <div style="display: flex; gap: 0.5rem;">
+                            <?php
+                            $start_page = max(1, $page - 2);
+                            $end_page = min($total_pages, $page + 2);
+
+                            if ($start_page > 1)
+                                echo '<span style="color: #94a3b8; padding: 0.75rem;">...</span>';
+
+                            for ($i = $start_page; $i <= $end_page; $i++): ?>
+                                <a href="?page=<?php echo $i; ?>&search=<?php echo urlencode($search); ?>&type=<?php echo urlencode($type); ?>&cat_id=<?php echo $cat_id; ?>"
+                                    style="padding: 0.75rem 1.25rem; border-radius: 12px; border: 1px solid <?php echo $i == $page ? 'var(--teal-primary)' : 'var(--border-color)'; ?>; background: <?php echo $i == $page ? 'var(--teal-primary)' : 'white'; ?>; color: <?php echo $i == $page ? 'white' : 'var(--foreground)'; ?>; font-weight: 700; text-decoration: none; transition: 0.2s;">
+                                    <?php echo $i; ?>
+                                </a>
+                            <?php endfor;
+
+                            if ($end_page < $total_pages)
+                                echo '<span style="color: #94a3b8; padding: 0.75rem;">...</span>';
+                            ?>
+                        </div>
+
+                        <?php if ($page < $total_pages): ?>
+                            <a href="?page=<?php echo $page + 1; ?>&search=<?php echo urlencode($search); ?>&type=<?php echo urlencode($type); ?>&cat_id=<?php echo $cat_id; ?>"
+                                style="padding: 0.75rem; border-radius: 12px; border: 1px solid var(--border-color); background: white; color: var(--teal-primary); display: flex; align-items: center; justify-content: center;">
+                                <i data-lucide="chevron-right"></i>
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                    <p style="text-align: center; margin-top: 1rem; font-size: 0.8125rem; color: #94a3b8;">
+                        กำลังแสดงหน้าที่ <?php echo $page; ?> จากทั้งหมด <?php echo $total_pages; ?> หน้า (รวม
+                        <?php echo $total_records; ?> รายการ)
+                    </p>
+                <?php endif; ?>
             <?php endif; ?>
         </main>
     </div>

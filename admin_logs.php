@@ -15,6 +15,12 @@ $filter_user = isset($_GET['user_id']) ? (int)$_GET['user_id'] : null;
 $filter_action = isset($_GET['action']) ? $_GET['action'] : null;
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 
+// Pagination Settings
+$limit = 50;
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+if ($page < 1) $page = 1;
+$offset = ($page - 1) * $limit;
+
 // Base Query
 $sql = "SELECT l.*, u.username, u.full_name, u.avatar 
         FROM activity_logs l 
@@ -39,7 +45,20 @@ if ($search) {
     $params[] = $term; $params[] = $term; $params[] = $term; $params[] = $term;
 }
 
-$sql .= " ORDER BY l.created_at DESC LIMIT 200";
+// For Count Query
+$count_sql = "SELECT COUNT(*) FROM activity_logs l LEFT JOIN users u ON l.user_id = u.id WHERE 1=1";
+if ($filter_user) $count_sql .= " AND l.user_id = $filter_user";
+if ($filter_action) $count_sql .= " AND l.action = '$filter_action'";
+if ($search) {
+    $count_sql .= " AND (u.full_name LIKE ? OR u.username LIKE ? OR l.action LIKE ? OR l.details LIKE ?)";
+}
+
+$count_stmt = $pdo->prepare($count_sql);
+$count_stmt->execute($search ? $params : []); // Only pass params if search is active
+$total_records = $count_stmt->fetchColumn();
+$total_pages = ceil($total_records / $limit);
+
+$sql .= " ORDER BY l.created_at DESC LIMIT $limit OFFSET $offset";
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
@@ -283,6 +302,41 @@ $users_list = $pdo->query("SELECT id, full_name, username FROM users ORDER BY fu
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Pagination UI -->
+                <?php if ($total_pages > 1): ?>
+                    <div class="pagination-container" style="padding: 1.5rem; border-top: 1px solid var(--border-color); background: #f8fafc; display: flex; justify-content: space-between; align-items: center;">
+                        <div style="font-size: 0.8125rem; color: #64748b;">
+                            Showing <b><?php echo number_format($offset + 1); ?></b> to <b><?php echo number_format(min($offset + $limit, $total_records)); ?></b> of <b><?php echo number_format($total_records); ?></b> logs
+                        </div>
+                        
+                        <div style="display: flex; gap: 0.25rem;">
+                            <?php if ($page > 1): ?>
+                                <a href="?page=1&search=<?php echo urlencode($search); ?>&user_id=<?php echo $filter_user; ?>&action=<?php echo urlencode($filter_action); ?>" 
+                                   class="btn-primary" style="padding: 0.5rem; background: white; color: #64748b; border: 1px solid #e2e8f0;"><i data-lucide="chevrons-left" style="width: 16px;"></i></a>
+                                <a href="?page=<?php echo $page - 1; ?>&search=<?php echo urlencode($search); ?>&user_id=<?php echo $filter_user; ?>&action=<?php echo urlencode($filter_action); ?>" 
+                                   class="btn-primary" style="padding: 0.5rem; background: white; color: #64748b; border: 1px solid #e2e8f0;"><i data-lucide="chevron-left" style="width: 16px;"></i></a>
+                            <?php endif; ?>
+
+                            <?php 
+                            $start_p = max(1, $page - 1);
+                            $end_p = min($total_pages, $page + 1);
+                            for ($i = $start_p; $i <= $end_p; $i++): ?>
+                                <a href="?page=<?php echo $i; ?>&search=<?php echo urlencode($search); ?>&user_id=<?php echo $filter_user; ?>&action=<?php echo urlencode($filter_action); ?>" 
+                                   class="btn-primary" style="padding: 0.5rem 1rem; background: <?php echo $i == $page ? 'var(--teal-primary)' : 'white'; ?>; color: <?php echo $i == $page ? 'white' : '#64748b'; ?>; border: 1px solid <?php echo $i == $page ? 'var(--teal-primary)' : '#e2e8f0'; ?>;">
+                                    <?php echo $i; ?>
+                                </a>
+                            <?php endfor; ?>
+
+                            <?php if ($page < $total_pages): ?>
+                                <a href="?page=<?php echo $page + 1; ?>&search=<?php echo urlencode($search); ?>&user_id=<?php echo $filter_user; ?>&action=<?php echo urlencode($filter_action); ?>" 
+                                   class="btn-primary" style="padding: 0.5rem; background: white; color: #64748b; border: 1px solid #e2e8f0;"><i data-lucide="chevron-right" style="width: 16px;"></i></a>
+                                <a href="?page=<?php echo $total_pages; ?>&search=<?php echo urlencode($search); ?>&user_id=<?php echo $filter_user; ?>&action=<?php echo urlencode($filter_action); ?>" 
+                                   class="btn-primary" style="padding: 0.5rem; background: white; color: #64748b; border: 1px solid #e2e8f0;"><i data-lucide="chevrons-right" style="width: 16px;"></i></a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
             </div>
             
             <p style="margin-top: 2rem; font-size: 0.8125rem; color: #94a3b8; text-align: center;">
