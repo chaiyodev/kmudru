@@ -44,6 +44,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $error = "คุณไม่สามารถลบบัญชีตัวเองได้";
             }
+        } elseif ($_POST['action'] === 'update_role') {
+            $user_id = $_POST['user_id'];
+            $new_role = $_POST['role'];
+            try {
+                $stmt = $pdo->prepare("UPDATE users SET role = ? WHERE id = ?");
+                $stmt->execute([$new_role, $user_id]);
+                $message = "อัปเดตบทบาทเรียบร้อยแล้ว";
+            } catch (PDOException $e) {
+                $error = "เกิดข้อผิดพลาดในการอัปเดตบทบาท";
+            }
+        } elseif ($_POST['action'] === 'toggle_status') {
+            $user_id = $_POST['user_id'];
+            $new_status = $_POST['status'];
+            if ($user_id != $_SESSION['user_id']) {
+                try {
+                    $stmt = $pdo->prepare("UPDATE users SET status = ? WHERE id = ?");
+                    $stmt->execute([$new_status, $user_id]);
+                    $message = $new_status === 'suspended' ? "ระงับการใช้งานสมาชิกเรียบร้อยแล้ว" : "คืนสิทธิ์การใช้งานสมาชิกเรียบร้อยแล้ว";
+                } catch (PDOException $e) {
+                    $error = "เกิดข้อผิดพลาดในการเปลี่ยนสถานะ";
+                }
+            } else {
+                $error = "คุณไม่สามารถระงับบัญชีตัวเองได้";
+            }
         }
     }
 }
@@ -132,6 +156,7 @@ $users = $pdo->query("SELECT * FROM users ORDER BY created_at DESC")->fetchAll()
                             <th style="padding: 1rem;">ชื่อ-นามสกุล</th>
                             <th style="padding: 1rem;">อีเมล</th>
                             <th style="padding: 1rem;">บทบาท (Role)</th>
+                            <th style="padding: 1rem;">สถานะ</th>
                             <th style="padding: 1rem; text-align: right;">จัดการ</th>
                         </tr>
                     </thead>
@@ -151,14 +176,23 @@ $users = $pdo->query("SELECT * FROM users ORDER BY created_at DESC")->fetchAll()
                                     <?php echo htmlspecialchars($user['email']); ?>
                                 </td>
                                 <td style="padding: 1rem;">
-                                    <span class="badge" style="background: <?php
-                                    echo match ($user['role']) {
-                                        'admin' => 'var(--teal-primary)',
-                                        'contributor' => '#3B82F6',
-                                        default => 'hsl(var(--muted))'
-                                    };
-                                    ?>; color: <?php echo $user['role'] === 'reader' ? 'inherit' : 'white'; ?>;">
-                                        <?php echo ucfirst($user['role']); ?>
+                                    <form method="POST" style="margin: 0;">
+                                        <input type="hidden" name="action" value="update_role">
+                                        <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">
+                                        <select name="role" onchange="this.form.submit()" class="form-select"
+                                            style="padding: 4px 8px; font-size: 0.8125rem; width: auto; min-width: 120px;">
+                                            <option value="reader" <?php echo $user['role'] === 'reader' ? 'selected' : ''; ?>>Reader</option>
+                                            <option value="contributor" <?php echo $user['role'] === 'contributor' ? 'selected' : ''; ?>>Contributor</option>
+                                            <?php if ($user['role'] === 'admin'): ?>
+                                                <option value="admin" selected>Admin</option>
+                                            <?php endif; ?>
+                                        </select>
+                                    </form>
+                                </td>
+                                <td style="padding: 1rem;">
+                                    <span class="badge"
+                                        style="background: <?php echo $user['status'] === 'active' ? '#10b981' : '#ef4444'; ?>; color: white;">
+                                        <?php echo $user['status'] === 'suspended' ? 'ระงับการใช้งาน' : 'ปกติ'; ?>
                                     </span>
                                 </td>
                                 <td
@@ -168,6 +202,19 @@ $users = $pdo->query("SELECT * FROM users ORDER BY created_at DESC")->fetchAll()
                                         <i data-lucide="history" style="width: 18px;"></i>
                                     </a>
                                     <?php if ($user['id'] != $_SESSION['user_id']): ?>
+                                        <form method="POST" style="display: inline;">
+                                            <input type="hidden" name="action" value="toggle_status">
+                                            <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">
+                                            <input type="hidden" name="status"
+                                                value="<?php echo $user['status'] === 'active' ? 'suspended' : 'active'; ?>">
+                                            <button type="submit" class="btn-icon"
+                                                style="color: <?php echo $user['status'] === 'active' ? '#f59e0b' : '#10b981'; ?>;"
+                                                title="<?php echo $user['status'] === 'active' ? 'ระงับการใช้งาน' : 'คืนสิทธิ์การใช้งาน'; ?>">
+                                                <i data-lucide="<?php echo $user['status'] === 'active' ? 'user-x' : 'user-check'; ?>"
+                                                    style="width: 18px;"></i>
+                                            </button>
+                                        </form>
+
                                         <form method="POST" onsubmit="return confirm('ยืนยันการลบสมาชิกนี้?');"
                                             style="display: inline;">
                                             <input type="hidden" name="action" value="delete_user">
@@ -215,7 +262,6 @@ $users = $pdo->query("SELECT * FROM users ORDER BY created_at DESC")->fetchAll()
                             <select name="role" class="form-select">
                                 <option value="reader">Reader (อ่านอย่างเดียว)</option>
                                 <option value="contributor">Contributor (เขียนได้)</option>
-                                <option value="admin">Admin (ผู้ดูแลระบบ)</option>
                             </select>
                         </div>
                         <button type="submit" class="btn-primary"

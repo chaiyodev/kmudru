@@ -24,6 +24,9 @@ function login($username, $password)
     $user = $stmt->fetch();
 
     if ($user && password_verify($password, $user['password'])) {
+        if ($user['status'] === 'suspended') {
+            return "บัญชีของคุณถูกระงับการใช้งานกรุณาติดต่อผู้ดูแลระบบ";
+        }
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['username'] = $user['username'];
         $_SESSION['full_name'] = $user['full_name'];
@@ -47,6 +50,19 @@ function require_login()
 {
     if (!is_logged_in()) {
         header("Location: login.php");
+        exit;
+    }
+
+    // Check if user is suspended (Live Check)
+    $pdo = get_pdo();
+    $stmt = $pdo->prepare("SELECT status FROM users WHERE id = ?");
+    $stmt->execute([$_SESSION['user_id']]);
+    $status = $stmt->fetchColumn();
+
+    if ($status === 'suspended') {
+        session_unset();
+        session_destroy();
+        header("Location: login.php?error=suspended");
         exit;
     }
 }

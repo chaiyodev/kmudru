@@ -37,10 +37,13 @@ if ($id > 0 && $pdo) {
     $pdo->prepare("UPDATE documents SET views = views + 1 WHERE id = ?")->execute([$id]);
 
     // Fetch Document
-    $stmt = $pdo->prepare("SELECT d.*, c.name as category_name, u.full_name as author_name, u.username as author_username, u.points as author_points, u.specialty as author_specialty
+    $stmt = $pdo->prepare("SELECT d.*, c.name as category_name, 
+                                  u.full_name as author_name, u.username as author_username, u.points as author_points, u.specialty as author_specialty,
+                                  le.full_name as last_editor_name
                            FROM documents d 
                            LEFT JOIN categories c ON d.category_id = c.id 
                            LEFT JOIN users u ON d.user_id = u.id 
+                           LEFT JOIN users le ON d.last_editor_id = le.id
                            WHERE d.id = ?");
     $stmt->execute([$id]);
     $doc = $stmt->fetch();
@@ -201,9 +204,38 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                                     style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i><?php echo $doc['views']; ?></span>
                             <span><i data-lucide="heart"
                                     style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i><?php echo $total_likes; ?></span>
+                            <?php if (!empty($doc['last_editor_name'])): ?>
+                                <span style="color: var(--teal-primary); font-weight: 600;">
+                                    <i data-lucide="edit-3"
+                                        style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i>
+                                    แก้ไขล่าสุดโดย <?php echo htmlspecialchars($doc['last_editor_name']); ?>
+                                </span>
+                            <?php endif; ?>
+                            <?php if ($doc['type'] === 'wiki'): ?>
+                                <a href="wiki_history.php?id=<?php echo $id; ?>"
+                                    style="color: hsl(var(--muted-foreground)); text-decoration: none; display: flex; align-items: center; gap: 4px; border: 1px solid var(--border-color); padding: 2px 8px; border-radius: 4px; background: white;">
+                                    <i data-lucide="history" style="width: 14px; height: 14px;"></i>
+                                    ประวัติการแก้ไข
+                                </a>
+                            <?php endif; ?>
                         </div>
 
-                        <div class="article-content"><?php echo nl2br(htmlspecialchars($doc['content'])); ?></div>
+                        <div class="article-content">
+                            <?php echo ($doc['type'] === 'wiki') ? nl2br(htmlspecialchars($doc['content'])) : nl2br(htmlspecialchars($doc['content'])); ?>
+                        </div>
+
+                        <?php if (!empty($doc['doc_references'])): ?>
+                            <div style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border-color);">
+                                <h3
+                                    style="font-size: 1.125rem; font-weight: 800; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.75rem;">
+                                    <i data-lucide="book" style="color: var(--teal-primary);"></i> แหล่งอ้างอิง (References)
+                                </h3>
+                                <div
+                                    style="font-size: 0.9375rem; color: #475569; padding: 1.5rem; background: #f8fafc; border-radius: 1rem; line-height: 1.7;">
+                                    <?php echo nl2br(htmlspecialchars($doc['doc_references'])); ?>
+                                </div>
+                            </div>
+                        <?php endif; ?>
 
                         <?php if (!empty($attachments)): ?>
                             <div style="margin-top: 3rem;">
@@ -274,10 +306,16 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                                 style="background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));"><i
                                     data-lucide="share-2"></i>แชร์</button>
 
-                            <?php if (isset($_SESSION['user_id']) && ($_SESSION['user_id'] == $doc['user_id'] || $_SESSION['role'] === 'admin')): ?>
+                            <?php
+                            $can_edit = is_logged_in() && ($user_id == $doc['user_id'] || $_SESSION['role'] === 'admin');
+                            if ($doc['type'] === 'wiki' && is_logged_in() && ($_SESSION['role'] === 'contributor' || $_SESSION['role'] === 'admin')) {
+                                $can_edit = true;
+                            }
+                            ?>
+                            <?php if ($can_edit): ?>
                                 <a href="edit.php?id=<?php echo $doc['id']; ?>" class="btn-primary"
                                     style="background: white; color: hsl(var(--foreground)); border: 1px solid var(--border-color);">
-                                    <i data-lucide="edit"></i>แก้ไข
+                                    <i data-lucide="edit"></i>แก้ไขบทความ
                                 </a>
                             <?php endif; ?>
                             <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>

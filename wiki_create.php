@@ -18,11 +18,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
     $category_id = $_POST['category_id'];
     $content = $_POST['content'];
     $tags = $_POST['tags'];
+    $doc_references = $_POST['doc_references'];
     $user_id = $_SESSION['user_id'];
 
     try {
-        $stmt = $pdo->prepare("INSERT INTO documents (title, content, category_id, user_id, type, tags) VALUES (?, ?, ?, ?, 'wiki', ?)");
-        $stmt->execute([$title, $content, $category_id, $user_id, $tags]);
+        $stmt = $pdo->prepare("INSERT INTO documents (title, content, category_id, user_id, type, tags, doc_references) VALUES (?, ?, ?, ?, 'wiki', ?, ?)");
+        $stmt->execute([$title, $content, $category_id, $user_id, $tags, $doc_references]);
+        $new_id = $pdo->lastInsertId();
+
+        // Save Initial Version
+        $v_stmt = $pdo->prepare("INSERT INTO document_versions (document_id, user_id, title_snapshot, content_snapshot, references_snapshot, edit_summary) VALUES (?, ?, ?, ?, ?, 'สร้างบทความเริ่มต้น')");
+        $v_stmt->execute([$new_id, $user_id, $title, $content, $doc_references]);
+
         $message = "บันทึกบทความ Wiki เรียบร้อยแล้ว!";
     } catch (PDOException $e) {
         $error = "เกิดข้อผิดพลาด: " . $e->getMessage();
@@ -252,6 +259,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
                                 <label class="form-label">แท็ก (Tags)</label>
                                 <input type="text" name="tags" class="form-input"
                                     placeholder="ใส่แท็กคั่นด้วยคอมม่า...">
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">แหล่งอ้างอิง (References)</label>
+                                <textarea name="doc_references" class="form-input"
+                                    style="height: 100px; resize: vertical;"
+                                    placeholder="ใส่แหล่งอ้างอิงข้อมูลของคุณที่นี่..."></textarea>
                             </div>
                         </div>
 

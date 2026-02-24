@@ -11,8 +11,8 @@ $user_id = $_SESSION['user_id'];
 $message = '';
 $error = '';
 
-// Check if document exists and belongs to user (or admin)
-$stmt = $pdo->prepare("SELECT * FROM documents WHERE id = ?");
+// Check if document exists and join with users to get author name
+$stmt = $pdo->prepare("SELECT d.*, u.full_name as author_name FROM documents d LEFT JOIN users u ON d.user_id = u.id WHERE d.id = ?");
 $stmt->execute([$id]);
 $doc = $stmt->fetch();
 
@@ -21,7 +21,16 @@ if (!$doc) {
 }
 
 // Authorization Check
-if ($doc['user_id'] != $user_id && $_SESSION['role'] !== 'admin') {
+$can_edit = ($doc['user_id'] == $user_id || $_SESSION['role'] === 'admin');
+if ($doc['type'] === 'wiki') {
+    // For Wiki, any contributor or higher can edit. 
+    // If we want total open, just: $can_edit = true;
+    if ($_SESSION['role'] === 'contributor' || $_SESSION['role'] === 'admin') {
+        $can_edit = true;
+    }
+}
+
+if (!$can_edit) {
     die("คุณไม่มีสิทธิ์แก้ไขเอกสารนี้");
 }
 
@@ -34,16 +43,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $category_id = (int) $_POST['category_id'];
     $status = $_POST['status'] ?? 'published';
     $tags = $_POST['tags'] ?? '';
+    $doc_references = $_POST['doc_references'] ?? '';
+    $edit_summary = trim($_POST['edit_summary'] ?? '');
 
     if (empty($title)) {
         $error = "กรุณาระบุหัวข้อ";
     } else {
         try {
-            $update_sql = "UPDATE documents SET title = ?, content = ?, category_id = ?, status = ?, tags = ?, updated_at = NOW() WHERE id = ?";
+            $update_sql = "UPDATE documents SET title = ?, content = ?, category_id = ?, status = ?, tags = ?, doc_references = ?, last_editor_id = ?, updated_at = NOW() WHERE id = ?";
             $update_stmt = $pdo->prepare($update_sql);
-            $update_stmt->execute([$title, $content, $category_id, $status, $tags, $id]);
+            $update_stmt->execute([$title, $content, $category_id, $status, $tags, $doc_references, $user_id, $id]);
 
-            $message = "บันทึกการแก้ไขเรียบร้อยแล้ว";
+            // Save Snapshot to history
+            $version_sql = "INSERT INTO document_versions (document_id, user_id, title_snapshot, content_snapshot, references_snapshot, edit_summary) VALUES (?, ?, ?, ?, ?, ?)";
+            $version_stmt = $pdo->prepare($version_sql);
+            $version_stmt->execute([$id, $user_id, $title, $content, $doc_references, $edit_summary]);
+
+            $message = "บันทึกการแก้ไขและสำรองประวัติเรียบร้อยแล้ว";
             // Refresh Data
             $stmt->execute([$id]);
             $doc = $stmt->fetch();
@@ -147,6 +163,21 @@ $page_title = "แก้ไขเนื้อหา: " . htmlspecialchars($doc['
                 </div>
             </header>
 
+            <?php if ($doc['type'] === 'wiki' && $doc['user_id'] != $user_id): ?>
+                <div
+                    style="background: hsl(var(--primary)/0.05); border: 1px dashed var(--teal-primary); padding: 1rem; border-radius: 0.75rem; margin-bottom: 1.5rem; display: flex; align-items: start; gap: 0.75rem;">
+                    <i data-lucide="info"
+                        style="color: var(--teal-primary); width: 20px; flex-shrink: 0; margin-top: 2px;"></i>
+                    <div style="font-size: 0.875rem;">
+                        <strong style="display: block; margin-bottom: 0.25rem;">พื้นที่ความร่วมมือ (Collaboration
+                            Space)</strong>
+                        คุณกำลังร่วมแก้ไขบทความวิกิของ
+                        <strong><?php echo htmlspecialchars($doc['author_name'] ?? 'เพื่อนร่วมงาน'); ?></strong>
+                        การบันทึกของคุณจะถูกบันทึกประวัติผู้แก้ไขล่าสุดในระบบครับ
+                    </div>
+                </div>
+            <?php endif; ?>
+
             <?php if ($message): ?>
                 <div
                     style="background: #dcfce7; color: #166534; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
@@ -189,6 +220,26 @@ $page_title = "แก้ไขเนื้อหา: " . htmlspecialchars($doc['
                             <div class="simple-editor">
                                 <textarea name="content"><?php echo htmlspecialchars($doc['content']); ?></textarea>
                             </div>
+                        </div>
+
+                        <div class="form-group" style="margin-top: 1.5rem;">
+                            <label class="form-label" style="font-weight: 700; margin-bottom: 0.5rem; display: block;">
+                                แหล่งอ้างอิง (References)
+                            </label>
+                            <textarea name="doc_references" class="form-input" style="height: 100px; resize: vertical;"
+                                placeholder="ใส่แหล่งอ้างอิงข้อมูลของคุณที่นี่..."><?php echo htmlspecialchars($doc['doc_references'] ?? ''); ?></textarea>
+                        </div>
+                    </div>
+
+                    <div class="editor-card">
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 700; margin-bottom: 0.5rem; display: block;">
+                                สรุปการแก้ไข (Edit Summary)
+                            </label>
+                            <input type="text" name="edit_summary" class="form-input"
+                                placeholder="เช่น 'แก้ไขคำผิด', 'เพิ่มเนื้อหาบทที่ 2'..." required>
+                            <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">อธิบายสั้นๆ
+                                ว่าคุณแก้ไขอะไรในรอบนี้</p>
                         </div>
                     </div>
                 </div>

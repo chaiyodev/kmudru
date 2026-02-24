@@ -6,7 +6,10 @@ require_once __DIR__ . '/logger.php';
 require_once __DIR__ . '/notifications.php';
 
 $sidebar_pdo = get_pdo();
-$doc_count = $sidebar_pdo->query("SELECT COUNT(*) FROM documents")->fetchColumn();
+
+// Consolidate counts to run only 1 query instead of many
+$type_counts = $sidebar_pdo->query("SELECT type, COUNT(*) as count FROM documents GROUP BY type")->fetchAll(PDO::FETCH_KEY_PAIR);
+$total_docs = array_sum($type_counts);
 $current_page = basename($_SERVER['PHP_SELF']);
 $type = $_GET['type'] ?? '';
 $role = strtolower($_SESSION['role'] ?? '');
@@ -55,8 +58,7 @@ if (is_logged_in()) {
             <a href="browse.php" class="nav-link <?php echo $current_page == 'browse.php' ? 'active' : ''; ?>">
                 <i data-lucide="search"></i>
                 <span>คลังความรู้</span>
-                <span
-                    class="nav-pill"><?php echo $sidebar_pdo->query("SELECT COUNT(*) FROM documents WHERE type='document'")->fetchColumn(); ?></span>
+                <span class="nav-pill"><?php echo $type_counts['document'] ?? 0; ?></span>
             </a>
             <a href="chat.php" class="nav-link <?php echo $current_page == 'chat.php' ? 'active' : ''; ?>">
                 <i data-lucide="message-square"></i>
