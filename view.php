@@ -8,6 +8,11 @@ $user_id = is_logged_in() ? $_SESSION['user_id'] : 0;
 $doc = null;
 
 if ($id > 0 && $pdo) {
+    // Security: Verify CSRF token for all POST actions
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        verify_csrf_token($_POST['csrf_token'] ?? '');
+    }
+
     // Handle Like Toggle
     if (isset($_POST['action']) && $_POST['action'] === 'like' && $user_id > 0) {
         $check = $pdo->prepare("SELECT id FROM document_likes WHERE document_id = ? AND user_id = ?");
@@ -291,6 +296,7 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                         <div
                             style="display: flex; gap: 0.75rem; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border-color);">
                             <form method="POST" style="display:inline;">
+                                <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                                 <input type="hidden" name="action" value="like">
                                 <button type="submit" class="btn-primary"
                                     style="<?php echo $user_liked ? 'background: hsl(339 90% 50%); color: white;' : 'background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));'; ?>">
@@ -322,6 +328,7 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                                 <form method="POST"
                                     onsubmit="return confirm('คุณต้องการลบบทความนี้ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้');"
                                     style="display:inline;">
+                                    <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                                     <input type="hidden" name="action" value="delete_doc">
                                     <button type="submit" class="btn-primary"
                                         style="background: hsl(0 84% 60% / 0.1); color: hsl(0 84% 60%); border: 1px solid hsl(0 84% 60% / 0.2);">
@@ -342,6 +349,7 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
 
                         <?php if (is_logged_in()): ?>
                             <form method="POST" style="margin-bottom: 2rem;">
+                                <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                                 <textarea id="comment-box" name="comment" placeholder="แบ่งปันมุมมองของคุณ..."
                                     style="width: 100%; padding: 1rem; border: 1px solid var(--border-color); border-radius: 0.75rem; min-height: 100px; font-family: inherit; resize: vertical; outline: none; transition: var(--transition-base);"
                                     onfocus="this.style.borderColor='var(--teal-primary)';this.style.boxShadow='0 0 0 3px hsl(var(--primary)/0.1)'"
