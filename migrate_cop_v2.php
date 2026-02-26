@@ -4,20 +4,46 @@ $pdo = get_pdo();
 
 if ($pdo) {
     try {
-        // Add new columns to communities
+        // 1. Create community_announcements table
         $pdo->exec("
-            ALTER TABLE communities 
-            ADD COLUMN IF NOT EXISTS category_id INT AFTER description,
-            ADD COLUMN IF NOT EXISTS cover_image VARCHAR(255) AFTER icon,
-            ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT TRUE AFTER cover_image,
-            ADD COLUMN IF NOT EXISTS color_theme VARCHAR(20) DEFAULT '#14b8a6' AFTER is_public;
+            CREATE TABLE IF NOT EXISTS community_announcements (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                community_id INT NOT NULL,
+                user_id INT NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                content TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (community_id) REFERENCES communities(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         ");
 
-        // Ensure community_members has permissions/roles as discussed (leader/member already exist)
+        // 2. Add last_activity to users table if not exists
+        $result = $pdo->query("SHOW COLUMNS FROM users LIKE 'last_activity'")->fetch();
+        if (!$result) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN last_activity TIMESTAMP NULL DEFAULT NULL");
+        }
 
-        echo "Database Upgraded Successfully!";
+        // 3. Add community_id and status to community_posts if not exists (checking existing schema from cop_view.php)
+        // From cop_view.php it seems community_posts already exists. 
+        // Let's ensure it has a good structure if it's missing from migrate_cop.php
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS community_posts (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                community_id INT NOT NULL,
+                user_id INT NOT NULL,
+                content TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (community_id) REFERENCES communities(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        ");
+
+        echo "Migration Successful! Added announcements table and activity tracking.";
     } catch (PDOException $e) {
         echo "Error: " . $e->getMessage();
     }
+} else {
+    echo "Database connection failed.";
 }
 ?>

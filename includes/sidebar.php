@@ -64,15 +64,7 @@ if (is_logged_in()) {
                 <i data-lucide="message-square"></i>
                 <span>กล่องข้อความ</span>
             </a>
-            <a href="notifications.php"
-                class="nav-link <?php echo $current_page == 'notifications.php' ? 'active' : ''; ?>">
-                <i data-lucide="bell"></i>
-                <span>การแจ้งเตือน</span>
-                <?php if ($unread_notifications > 0): ?>
-                    <span class="nav-pill"
-                        style="background: #ef4444; color: white;"><?php echo $unread_notifications; ?></span>
-                <?php endif; ?>
-            </a>
+            <!-- Notification moved to top header -->
         </nav>
 
         <nav class="nav-group">
@@ -292,6 +284,27 @@ if (is_logged_in()) {
         display: flex;
         gap: 0.5rem;
     }
+
+    .ai-drawer-footer input {
+        flex: 1;
+        padding: 0.75rem 1rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 100px;
+        outline: none;
+    }
+
+    .ai-drawer-footer button {
+        width: 44px;
+        height: 44px;
+        background: var(--teal-primary);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+    }
 </style>
 
 <!-- Mobile Top Bar (Global) -->
@@ -392,6 +405,25 @@ if (is_logged_in()) {
         const sidebar = document.getElementById('main-sidebar');
         sidebar.classList.toggle('mobile-open');
     }
+
+    function toggleNotifications(event) {
+        if (event) event.stopPropagation();
+        const dropdown = document.getElementById('notif-dropdown');
+        if (dropdown) dropdown.classList.toggle('show');
+
+        // Close dropdown when clicking outside
+        if (dropdown && dropdown.classList.contains('show')) {
+            const closeHandler = (e) => {
+                if (!dropdown.contains(e.target) && !e.target.closest('.notification-bell-btn')) {
+                    dropdown.classList.remove('show');
+                    document.removeEventListener('click', closeHandler);
+                }
+            };
+            setTimeout(() => {
+                document.addEventListener('click', closeHandler);
+            }, 10);
+        }
+    }
 </script>
 
 <!-- Mobile Sidebar Overlay -->
@@ -423,109 +455,6 @@ if (is_logged_in()) {
     </div>
 </div>
 
-<style>
-    .ai-drawer {
-        position: fixed;
-        right: -400px;
-        top: 0;
-        width: 380px;
-        height: 100vh;
-        background: white;
-        box-shadow: -5px 0 25px rgba(0, 0, 0, 0.1);
-        z-index: 1000;
-        transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        display: flex;
-        flex-direction: column;
-    }
-
-    .ai-drawer.open {
-        right: 0;
-    }
-
-    .ai-drawer-header {
-        padding: 1.5rem;
-        background: linear-gradient(135deg, var(--teal-primary) 0%, #0ea5e9 100%);
-        color: white;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-
-    .ai-avatar-m {
-        width: 40px;
-        height: 40px;
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .ai-drawer-body {
-        flex: 1;
-        padding: 1.5rem;
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-        background: #f8fafc;
-    }
-
-    .ai-msg {
-        max-width: 85%;
-        padding: 0.75rem 1rem;
-        border-radius: 1rem;
-        font-size: 0.875rem;
-        line-height: 1.5;
-    }
-
-    .ai-msg-bot {
-        background: white;
-        color: #1e293b;
-        align-self: flex-start;
-        border-bottom-left-radius: 0.25rem;
-        border: 1px solid #e2e8f0;
-    }
-
-    .ai-msg-user {
-        background: var(--teal-primary);
-        color: white;
-        align-self: flex-end;
-        border-bottom-right-radius: 0.25rem;
-    }
-
-    .ai-drawer-footer {
-        padding: 1rem;
-        border-top: 1px solid #e2e8f0;
-    }
-
-    .ai-drawer-footer form {
-        display: flex;
-        gap: 0.5rem;
-    }
-
-    .ai-drawer-footer input {
-        flex: 1;
-        padding: 0.75rem 1rem;
-        border: 1px solid #e2e8f0;
-        border-radius: 100px;
-        outline: none;
-    }
-
-    .ai-drawer-footer button {
-        width: 44px;
-        height: 44px;
-        background: var(--teal-primary);
-        color: white;
-        border: none;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-    }
-</style>
-
 <script>
     function sendDrawerMessage(e) {
         e.preventDefault();
@@ -550,3 +479,35 @@ if (is_logged_in()) {
         }, 1000);
     }
 </script>
+
+<!-- Notification Dropdown Component -->
+<?php
+function render_notification_component($unread_count = 0)
+{
+?>
+    <div style="position: relative; z-index: 1001;">
+        <div class="notification-bell-btn" onclick="toggleNotifications(event)">
+            <i data-lucide="bell" style="width: 22px; height: 22px;"></i>
+            <?php if ($unread_count > 0): ?>
+                <span class="bell-badge"><?php echo $unread_count; ?></span>
+            <?php endif; ?>
+        </div>
+
+        <div class="notification-dropdown" id="notif-dropdown">
+            <div class="notif-header">
+                <h3>การแจ้งเตือน</h3>
+            </div>
+            <div class="notif-body">
+                <div class="notif-empty">
+                    <i data-lucide="bell-off" style="width: 48px; height: 48px;"></i>
+                    <p>ไม่มีการแจ้งเตือนใหม่</p>
+                </div>
+            </div>
+            <div class="notif-footer">
+                <a href="notifications.php">ดูการแจ้งเตือนทั้งหมด</a>
+            </div>
+        </div>
+    </div>
+<?php
+}
+?>

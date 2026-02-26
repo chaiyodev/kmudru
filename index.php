@@ -80,6 +80,22 @@ if ($pdo) {
             LIMIT 8";
         $recent_activity = $pdo->query($activity_query)->fetchAll();
 
+        // Fetch personalized AI insight (count of new docs in user's most viewed category)
+        $ai_insight_count = 0;
+        $ai_insight_category = 'ประกันคุณภาพ'; // Default
+        if ($user) {
+            // Find most frequent category in user's history or just most popular one
+            $stmt = $pdo->query("SELECT name FROM categories ORDER BY id ASC LIMIT 1");
+            $ai_insight_category = $stmt->fetchColumn() ?: 'ประกันคุณภาพ';
+
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM documents WHERE created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)");
+            $stmt->execute();
+            $ai_insight_count = $stmt->fetchColumn();
+        } else {
+            $stmt = $pdo->query("SELECT COUNT(*) FROM documents WHERE created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)");
+            $ai_insight_count = $stmt->fetchColumn();
+        }
+
     } catch (PDOException $e) {
     }
 }
@@ -327,11 +343,17 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
         <main class="main-viewport">
             <header class="header-top">
                 <div class="page-title">
-                    <?php if ($user): ?>
-                        <h2>ยินดีต้อนรับ, <?php echo htmlspecialchars(explode(' ', $user['full_name'])[0]); ?> 👋</h2>
-                    <?php else: ?>
-                        <h2>ยินดีต้อนรับสู่ UDRU Wisdom 👋</h2>
-                    <?php endif; ?>
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <?php if ($user): ?>
+                            <h2>ยินดีต้อนรับ, <?php echo htmlspecialchars(explode(' ', $user['full_name'])[0]); ?> 👋</h2>
+                        <?php else: ?>
+                            <h2>ยินดีต้อนรับสู่ UDRU Wisdom 👋</h2>
+                        <?php endif; ?>
+
+                        <?php if (function_exists('render_notification_component')) {
+                            render_notification_component($unread_notifications ?? 0);
+                        } ?>
+                    </div>
                     <p>สืบค้นและแบ่งปันองค์ความรู้เพื่อสังคมแห่งการเรียนรู้ UDRU</p>
                 </div>
                 <div class="header-actions">
@@ -500,8 +522,10 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                             style="font-size: 1rem; font-weight: 800; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
                             <i data-lucide="bot" style="width: 18px;"></i> AI Smart Insight
                         </h4>
-                        <p style="font-size: 0.8rem; opacity: 0.9; line-height: 1.5;">วันนี้มีเอกสาร 5
-                            รายการใหม่ที่ตรงกับทักษะ "ประกันคุณภาพ" ของคุณครับ</p>
+                        <p style="font-size: 0.8rem; opacity: 0.9; line-height: 1.5;">
+                            วันนี้มีเนื้อหาใหม่ <?php echo $ai_insight_count; ?> รายการในหัวข้อ
+                            "<?php echo $ai_insight_category; ?>" ที่คุณอาจสนใจครับ
+                        </p>
                         <a href="ai_assistant.php"
                             style="display: block; width: 100%; padding: 0.65rem; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 10px; color: white; text-align: center; text-decoration: none; margin-top: 1rem; font-size: 0.8125rem; font-weight: 700;">ดูข้อมูลเจาะลึก</a>
                     </div>

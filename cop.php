@@ -10,7 +10,8 @@ $stats = ['total' => 0, 'members' => 0, 'active' => 0];
 if ($pdo) {
     // Fetch communities with details
     $stmt = $pdo->query("SELECT c.*, cat.name as category_name,
-                        (SELECT COUNT(*) FROM community_members WHERE community_id = c.id) as member_count 
+                        (SELECT COUNT(*) FROM community_members WHERE community_id = c.id) as member_count,
+                        (SELECT GROUP_CONCAT(u.username) FROM community_members cm JOIN users u ON cm.user_id = u.id WHERE cm.community_id = c.id LIMIT 3) as member_samples
                         FROM communities c
                         LEFT JOIN categories cat ON c.category_id = cat.id
                         ORDER BY c.created_at DESC");
@@ -213,16 +214,14 @@ if ($pdo) {
                                     สมาชิก
                                 </div>
                                 <div style="display: flex; -webkit-rtl-ordering: visual; direction: rtl;">
-                                    <!-- Simple Avatar Stack Mockup -->
-                                    <div
-                                        style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; background: #e2e8f0; margin-left: -8px;">
-                                    </div>
-                                    <div
-                                        style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; background: #cbd5e1; margin-left: -8px;">
-                                    </div>
-                                    <div
-                                        style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; background: #94a3b8; margin-left: -8px;">
-                                    </div>
+                                    <?php 
+                                    $samples = !empty($cop['member_samples']) ? explode(',', $cop['member_samples']) : [];
+                                    foreach(array_reverse($samples) as $sample): ?>
+                                        <div title="<?php echo e($sample); ?>"
+                                            style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; background: #e2e8f0; margin-left: -8px; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: 700; color: #64748b;">
+                                            <?php echo strtoupper(substr($sample, 0, 1)); ?>
+                                        </div>
+                                    <?php endforeach; ?>
                                 </div>
                             </div>
 

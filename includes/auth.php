@@ -84,6 +84,17 @@ function require_login()
         exit;
     }
 
+    $pdo = get_pdo();
+    if ($pdo) {
+        // Update last_activity with safety
+        try {
+            $stmt = $pdo->prepare("UPDATE users SET last_activity = NOW() WHERE id = ?");
+            $stmt->execute([$_SESSION['user_id']]);
+        } catch (PDOException $e) {
+            // Silently ignore if column doesn't exist yet
+        }
+    }
+
     // Check if user is suspended (Live Check)
     $pdo = get_pdo();
     $stmt = $pdo->prepare("SELECT status FROM users WHERE id = ?");

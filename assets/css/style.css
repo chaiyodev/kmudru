@@ -30,10 +30,10 @@
 
     /* Spacing & Layout Tokens (Tailwind Scale) */
     --sidebar-width: 256px;
-    --sidebar-collapsed-width: 72px;
+    --sidebar-collapsed-width: 60px;
     --header-height: 64px;
     --container-max: 1280px;
-    --transition-base: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-base: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Global Reset */
@@ -69,10 +69,14 @@ body {
     display: flex;
     flex-direction: column;
     padding: 0;
-    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
     height: 100dvh;
     /* Unified height */
+}
+
+.sidebar.collapsed {
+    width: var(--sidebar-collapsed-width) !important;
 }
 
 /* Initial Collapse State via JS class on HTML */
@@ -95,6 +99,10 @@ html.sidebar-collapsed-init .sidebar-toggle span {
     padding: 0.75rem 0.75rem;
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+.sidebar.collapsed .sidebar-nav-container {
+    padding: 0.75rem 0;
 }
 
 .sidebar-nav-container::-webkit-scrollbar {
@@ -125,20 +133,24 @@ html.sidebar-collapsed-init .sidebar-toggle span {
 }
 
 /* Collapsed Sidebar State */
-.sidebar.collapsed {
-    width: var(--sidebar-collapsed-width);
-    padding: 0;
-    /* Changed from 1.5rem 0.5rem to 0 for stability */
-}
-
-.sidebar.collapsed .nav-group {
-    margin-bottom: 0.5rem;
-}
-
 .sidebar.collapsed .brand-info,
-.sidebar.collapsed .nav-label,
-.sidebar.collapsed .nav-link span,
-.sidebar.collapsed .nav-pill,
+.sidebar.collapsed .nav-label {
+    display: none !important;
+}
+
+.sidebar.collapsed .nav-pill {
+    display: none !important;
+}
+
+.sidebar.collapsed .nav-link span {
+    display: none !important;
+}
+
+.sidebar.collapsed .nav-link i,
+.sidebar.collapsed .nav-link svg {
+    margin: 0 !important;
+}
+
 .sidebar.collapsed .sidebar-toggle span,
 .sidebar.collapsed .profile-name,
 .sidebar.collapsed .role-badge,
@@ -209,6 +221,8 @@ html.sidebar-collapsed-init .sidebar-toggle span {
     padding: 0.5rem 0 !important;
     display: block !important;
     background: transparent !important;
+    margin: 0 !important;
+    border: none !important;
 }
 
 .user-profile-card {
@@ -289,8 +303,8 @@ html.sidebar-collapsed-init .sidebar-toggle span {
 }
 
 .sidebar.collapsed .profile-main-info {
-    width: 44px !important;
-    height: 44px !important;
+    width: 40px !important;
+    height: 40px !important;
     margin: 4px auto !important;
     padding: 0 !important;
     display: flex !important;
@@ -306,10 +320,10 @@ html.sidebar-collapsed-init .sidebar-toggle span {
 }
 
 .sidebar.collapsed .brand-icon {
-    width: 44px !important;
-    height: 44px !important;
+    width: 40px !important;
+    height: 40px !important;
     background: var(--teal-primary) !important;
-    border-radius: 12px !important;
+    border-radius: 10px !important;
     margin: 4px auto !important;
     /* Unified compact Margin */
     display: block !important;
@@ -356,11 +370,11 @@ html.sidebar-collapsed-init .sidebar-toggle span {
 }
 
 .sidebar.collapsed .sidebar-toggle {
-    width: 44px !important;
-    height: 44px !important;
+    width: 40px !important;
+    height: 40px !important;
     margin: 4px auto !important;
     /* Unified compact Margin */
-    border-radius: 12px !important;
+    border-radius: 10px !important;
     background: rgba(255, 255, 255, 0.18) !important;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4) !important;
     border: 1px solid rgba(255, 255, 255, 0.15) !important;
@@ -489,7 +503,7 @@ html.sidebar-collapsed-init .sidebar-toggle span {
     margin-left: var(--sidebar-width);
     flex: 1;
     padding: 2rem 2.5rem;
-    transition: margin-left 0.3s ease;
+    transition: margin-left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Responsive main content when sidebar is collapsed */
@@ -1137,4 +1151,127 @@ body.sidebar-collapsed .main-viewport {
     .hero-centered h1 {
         font-size: 1.5rem !important;
     }
+}
+
+/* Notification Header Button & Dropdown */
+.notification-bell-btn {
+    width: 38px;
+    height: 38px;
+    background: transparent;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748b;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.notification-bell-btn:hover {
+    background: #f1f5f9;
+    color: var(--teal-primary);
+    border-color: var(--teal-primary);
+}
+
+.bell-badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    background: #ef4444;
+    color: white;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    font-size: 0.6rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    border: 2px solid white;
+}
+
+.notification-dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 0;
+    /* Align left for the new position */
+    width: 320px;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    border: 1px solid #f1f5f9;
+    z-index: 1000;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    transform-origin: top left;
+}
+
+.notification-dropdown.show {
+    display: flex;
+    animation: dropdownPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes dropdownPop {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.notif-header {
+    padding: 1.25rem;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.notif-header h3 {
+    font-size: 1rem !important;
+    font-weight: 800 !important;
+    color: #1e293b !important;
+    margin: 0 !important;
+}
+
+.notif-body {
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 1rem;
+}
+
+.notif-empty {
+    padding: 2.5rem 1rem;
+    text-align: center;
+    color: #94a3b8;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.notif-empty i {
+    opacity: 0.5;
+}
+
+.notif-footer {
+    padding: 1rem;
+    background: #f8fafc;
+    border-top: 1px solid #f1f5f9;
+    text-align: center;
+}
+
+.notif-footer a {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--teal-primary);
+    text-decoration: none;
 }
