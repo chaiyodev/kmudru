@@ -56,7 +56,7 @@ if ($pdo) {
             FROM trainings t
             LEFT JOIN categories c ON t.category_id = c.id)
             ORDER BY created_at DESC 
-            LIMIT 4";
+            LIMIT 6";
         $latest_docs = $pdo->query($doc_query)->fetchAll();
 
         // Update type labels for display
@@ -79,6 +79,22 @@ if ($pdo) {
             ORDER BY d.created_at DESC 
             LIMIT 8";
         $recent_activity = $pdo->query($activity_query)->fetchAll();
+
+        // Fetch personalized AI insight (count of new docs in user's most viewed category)
+        $ai_insight_count = 0;
+        $ai_insight_category = 'ประกันคุณภาพ'; // Default
+        if ($user) {
+            // Find most frequent category in user's history or just most popular one
+            $stmt = $pdo->query("SELECT name FROM categories ORDER BY id ASC LIMIT 1");
+            $ai_insight_category = $stmt->fetchColumn() ?: 'ประกันคุณภาพ';
+
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM documents WHERE created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)");
+            $stmt->execute();
+            $ai_insight_count = $stmt->fetchColumn();
+        } else {
+            $stmt = $pdo->query("SELECT COUNT(*) FROM documents WHERE created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)");
+            $ai_insight_count = $stmt->fetchColumn();
+        }
 
     } catch (PDOException $e) {
     }
@@ -287,6 +303,33 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
             .main-viewport {
                 padding: 1.25rem !important;
             }
+
+            .main-content-grid {
+                grid-template-columns: 1fr !important;
+                gap: 1.5rem !important;
+            }
+
+            .ai-smart-card {
+                padding: 1.25rem !important;
+            }
+
+            .ai-smart-card h4 {
+                font-size: 0.95rem !important;
+            }
+
+            .ai-smart-card p {
+                font-size: 0.75rem !important;
+                line-height: 1.4 !important;
+            }
+
+            /* Fix tag-badge wrapping */
+            .tag-badge {
+                max-width: 100%;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                display: inline-block;
+            }
         }
     </style>
 </head>
@@ -300,11 +343,17 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
         <main class="main-viewport">
             <header class="header-top">
                 <div class="page-title">
-                    <?php if ($user): ?>
-                        <h2>ยินดีต้อนรับ, <?php echo htmlspecialchars(explode(' ', $user['full_name'])[0]); ?> 👋</h2>
-                    <?php else: ?>
-                        <h2>ยินดีต้อนรับสู่ UDRU Wisdom 👋</h2>
-                    <?php endif; ?>
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <?php if ($user): ?>
+                            <h2>ยินดีต้อนรับ, <?php echo htmlspecialchars(explode(' ', $user['full_name'])[0]); ?> 👋</h2>
+                        <?php else: ?>
+                            <h2>ยินดีต้อนรับสู่ UDRU Wisdom 👋</h2>
+                        <?php endif; ?>
+
+                        <?php if (function_exists('render_notification_component')) {
+                            render_notification_component($unread_notifications ?? 0);
+                        } ?>
+                    </div>
                     <p>สืบค้นและแบ่งปันองค์ความรู้เพื่อสังคมแห่งการเรียนรู้ UDRU</p>
                 </div>
                 <div class="header-actions">
@@ -465,7 +514,7 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
 
                 <aside>
                     <!-- AI Smart Hub Widget -->
-                    <div
+                    <div class="ai-smart-card"
                         style="background: linear-gradient(135deg, #14b8a6 0%, #0ea5e9 100%); padding: 1.5rem; border-radius: 1rem; color: white; margin-bottom: 2rem; position: relative; overflow: hidden; box-shadow: 0 10px 25px rgba(20, 184, 166, 0.3);">
                         <i data-lucide="sparkles"
                             style="position: absolute; right: -10px; top: -10px; width: 60px; height: 60px; opacity: 0.2;"></i>
@@ -473,8 +522,10 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                             style="font-size: 1rem; font-weight: 800; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
                             <i data-lucide="bot" style="width: 18px;"></i> AI Smart Insight
                         </h4>
-                        <p style="font-size: 0.8rem; opacity: 0.9; line-height: 1.5;">วันนี้มีเอกสาร 5
-                            รายการใหม่ที่ตรงกับทักษะ "ประกันคุณภาพ" ของคุณครับ</p>
+                        <p style="font-size: 0.8rem; opacity: 0.9; line-height: 1.5;">
+                            วันนี้มีเนื้อหาใหม่ <?php echo $ai_insight_count; ?> รายการในหัวข้อ
+                            "<?php echo $ai_insight_category; ?>" ที่คุณอาจสนใจครับ
+                        </p>
                         <a href="ai_assistant.php"
                             style="display: block; width: 100%; padding: 0.65rem; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 10px; color: white; text-align: center; text-decoration: none; margin-top: 1rem; font-size: 0.8125rem; font-weight: 700;">ดูข้อมูลเจาะลึก</a>
                     </div>

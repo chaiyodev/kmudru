@@ -3,28 +3,52 @@
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/logger.php';
+require_once __DIR__ . '/notifications.php';
 
 $sidebar_pdo = get_pdo();
-$doc_count = $sidebar_pdo->query("SELECT COUNT(*) FROM documents")->fetchColumn();
+
+// Consolidate counts to run only 1 query instead of many
+$type_counts = $sidebar_pdo->query("SELECT type, COUNT(*) as count FROM documents GROUP BY type")->fetchAll(PDO::FETCH_KEY_PAIR);
+$total_docs = array_sum($type_counts);
 $current_page = basename($_SERVER['PHP_SELF']);
+$type = $_GET['type'] ?? '';
+$role = strtolower($_SESSION['role'] ?? '');
 
 // Track page visit for analytics
 track_visitor($current_page);
 
 // Fetch current user data for profile card
 $sidebar_user = null;
+$unread_notifications = 0;
 if (is_logged_in()) {
-    $stmt = $sidebar_pdo->prepare("SELECT avatar FROM users WHERE id = ?");
+    $stmt = $sidebar_pdo->prepare("SELECT id, avatar FROM users WHERE id = ?");
     $stmt->execute([$_SESSION['user_id']]);
     $sidebar_user = $stmt->fetch();
+
+    if ($sidebar_user) {
+        $unread_notifications = get_unread_count($sidebar_pdo, $sidebar_user['id']);
+        // Sync session avatar with DB just in case
+        if (!empty($sidebar_user['avatar'])) {
+            $_SESSION['avatar'] = $sidebar_user['avatar'];
+        }
+    }
 }
 ?>
-<aside class="sidebar" id="main-sidebar" style="height: 100dvh; display: flex; flex-direction: column;">
+<script>
+    // Pre-paint state check to prevent layout shift
+    if (localStorage.getItem('sidebarCollapsed') === 'true') {
+        document.documentElement.classList.add('sidebar-collapsed-init');
+    }
+</script>
+
+<aside
+    class="sidebar <?php echo isset($_COOKIE['sidebarCollapsed']) && $_COOKIE['sidebarCollapsed'] == 'true' ? 'collapsed' : ''; ?>"
+    id="main-sidebar">
     <div class="sidebar-brand">
         <div class="brand-icon"><i data-lucide="book-open"></i></div>
         <div class="brand-info">
-            <h1 style="color: white !important;">UDRU Wisdom</h1>
-            <span style="color: rgba(255,255,255,0.5) !important;">Knowledge Center</span>
+            <h1>UDRU Wisdom</h1>
+            <span>Knowledge Center</span>
         </div>
     </div>
 
@@ -38,18 +62,13 @@ if (is_logged_in()) {
             <a href="browse.php" class="nav-link <?php echo $current_page == 'browse.php' ? 'active' : ''; ?>">
                 <i data-lucide="search"></i>
                 <span>คลังความรู้</span>
-                <span
-                    class="nav-pill"><?php echo $sidebar_pdo->query("SELECT COUNT(*) FROM documents WHERE type='document'")->fetchColumn(); ?></span>
+                <span class="nav-pill"><?php echo $type_counts['document'] ?? 0; ?></span>
             </a>
             <a href="chat.php" class="nav-link <?php echo $current_page == 'chat.php' ? 'active' : ''; ?>">
                 <i data-lucide="message-square"></i>
                 <span>กล่องข้อความ</span>
             </a>
-            <a href="ai_assistant.php"
-                class="nav-link <?php echo $current_page == 'ai_assistant.php' ? 'active' : ''; ?>">
-                <i data-lucide="bot"></i>
-                <span>AI Assistant</span>
-            </a>
+            <!-- Notification moved to top header -->
         </nav>
 
         <nav class="nav-group">
@@ -86,49 +105,47 @@ if (is_logged_in()) {
                 <i data-lucide="settings"></i>
                 <span>ตั้งค่าระบบ</span>
             </a>
-            <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
+            <?php if ($role === 'admin'): ?>
                 <a href="admin_dashboard.php"
-                    class="nav-link <?php echo ($current_page == 'admin_dashboard.php' || $current_page == 'admin_users.php' || $current_page == 'admin_logs.php') ? 'active' : ''; ?>">
+                    class="nav-link <?php echo ($current_page == 'admin_dashboard.php') ? 'active' : ''; ?>">
                     <i data-lucide="shield"></i>
-                    <span>ผู้ดูแลระบบ</span>
+                    <span>การจัดการระบบ</span>
                 </a>
             <?php endif; ?>
         </nav>
+
+
     </div>
 
     <div class="sidebar-footer">
         <?php if (is_logged_in()): ?>
             <div class="user-profile-card">
-                <div class="profile-main-info"
-                    style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; overflow: hidden;">
+                <div class="profile-main-info">
                     <?php
-                    $avatar_url = !empty($sidebar_user['avatar']) ? 'uploads/avatars/' . $sidebar_user['avatar'] : '';
-                    $full_path = 'c:/xampp/htdocs/kmudru/' . $avatar_url;
-                    $has_avatar = !empty($avatar_url) && file_exists($full_path);
+                    // Prefer session if sidebar_user fetch had any issue, but sidebar_user is fresher
+                    $current_avatar = !empty($sidebar_user['avatar']) ? $sidebar_user['avatar'] : ($_SESSION['avatar'] ?? '');
+                    $avatar_url = !empty($current_avatar) ? 'uploads/avatars/' . $current_avatar : '';
+                    $has_avatar = !empty($current_avatar) && file_exists(__DIR__ . '/../' . $avatar_url);
                     $initials = strtoupper(substr($_SESSION['username'] ?? 'U', 0, 1));
                     ?>
                     <div class="profile-avatar"
-                        style="width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0; display: flex !important; align-items: center; justify-content: center; background-color: var(--teal-primary); background-size: cover; background-position: center; <?php echo $has_avatar ? "background-image: url('$avatar_url');" : ""; ?>">
+                        style="<?php echo $has_avatar ? "background-image: url('$avatar_url'); background-size: cover; background-position: center; width: 44px; height: 44px;" : "width: 44px; height: 44px;"; ?>">
                         <?php if (!$has_avatar): ?>
-                            <span style="color: white; font-weight: 800; font-size: 0.875rem;"><?php echo $initials; ?></span>
+                            <span><?php echo $initials; ?></span>
                         <?php endif; ?>
                     </div>
-                    <div class="profile-info" style="flex: 1; min-width: 0;">
-                        <div class="profile-name"
-                            style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #ffffff !important; font-weight: 800 !important; font-size: 0.8125rem; line-height: 1.2;">
+                    <div class="profile-info">
+                        <div class="profile-name">
                             <?php echo htmlspecialchars($_SESSION['full_name'] ?? $_SESSION['username']); ?>
                         </div>
-                        <div class="role-badge"
-                            style="color: rgba(255,255,255,0.7) !important; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; margin-top: 2px;">
+                        <div class="role-badge">
                             <?php echo htmlspecialchars($_SESSION['role']); ?>
                         </div>
                     </div>
                 </div>
-                <div class="profile-actions" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem;">
-                    <a href="profile.php" class="btn-sm"
-                        style="text-align: center; background: white; border: 1px solid var(--border-color); border-radius: 6px; padding: 0.2rem; font-size: 0.7rem; color: #1e293b; text-decoration: none; font-weight: 700;">โปรไฟล์</a>
-                    <a href="logout.php" class="btn-sm"
-                        style="text-align: center; background: white; border: 1px solid var(--border-color); border-radius: 6px; padding: 0.2rem; font-size: 0.7rem; color: #ef4444; text-decoration: none; font-weight: 700;">ออก</a>
+                <div class="profile-actions">
+                    <a href="profile.php" class="btn-sm">โปรไฟล์</a>
+                    <a href="logout.php" class="btn-sm logout">ออกระบบ</a>
                 </div>
             </div>
         <?php else: ?>
@@ -138,133 +155,56 @@ if (is_logged_in()) {
             </a>
         <?php endif; ?>
 
-        <button class="sidebar-toggle" onclick="toggleSidebar()" style="margin-bottom: 1rem;">
+        <button class="sidebar-toggle" id="main-toggle-btn" onclick="toggleSidebar()">
             <i data-lucide="chevrons-left" id="toggle-icon"></i>
             <span>ย่อเมนู</span>
         </button>
-    </div>
-</aside>
 
-<!-- Mobile Top Bar (Global) -->
-<div class="mobile-top-bar">
-    <div style="display: flex; align-items: center; gap: 0.75rem;">
-        <div class="mobile-logo-box">
-            <i data-lucide="book-open" style="width: 18px;"></i>
-        </div>
-        <span class="mobile-brand-name">UDRU Wisdom</span>
-    </div>
-    <button onclick="toggleMobileMenu()" class="mobile-menu-btn">
-        <i data-lucide="menu"></i>
-    </button>
-</div>
-
-<!-- Global AI Assistant UI -->
-<div class="ai-float-btn-container">
-    <button class="ai-float-btn" onclick="aiAssistant('chat')">
-        <i data-lucide="bot-message-square" style="width: 28px; height: 28px;"></i>
-    </button>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-<script>
-    // Theme Manager Script
-    (function () {
-        const savedTheme = localStorage.getItem('theme-primary');
-        const isDarkMode = localStorage.getItem('theme-dark-mode') === 'true';
-
-        if (savedTheme) {
-            document.documentElement.style.setProperty('--primary', savedTheme);
-            document.documentElement.style.setProperty('--teal-primary', `hsl(${savedTheme})`);
-        }
-
-        if (isDarkMode) {
-            document.documentElement.classList.add('dark-mode');
-            // Basic dark mode overrides if not in CSS
-            document.documentElement.style.setProperty('--background', '222 47% 11%');
-            document.documentElement.style.setProperty('--foreground', '210 40% 98%');
-            document.documentElement.style.setProperty('--card', '217 33% 17%');
-            document.documentElement.style.setProperty('--border', '217 33% 25%');
-            document.documentElement.style.setProperty('--muted', '217 33% 20%');
-        }
-    })();
-
-    function toggleSidebar() {
-        const sidebar = document.getElementById('main-sidebar');
-        const body = document.body;
-        const icon = document.getElementById('toggle-icon');
-
-        sidebar.classList.toggle('collapsed');
-        body.classList.toggle('sidebar-collapsed');
-
-        // Update icon
-        if (sidebar.classList.contains('collapsed')) {
-            icon.setAttribute('data-lucide', 'chevrons-right');
-            localStorage.setItem('sidebarCollapsed', 'true');
-        } else {
-            icon.setAttribute('data-lucide', 'chevrons-left');
-            localStorage.setItem('sidebarCollapsed', 'false');
-        }
-        lucide.createIcons();
-    }
-
-    // Restore sidebar state on page load
-    document.addEventListener('DOMContentLoaded', function () {
-        if (localStorage.getItem('sidebarCollapsed') === 'true') {
-            document.getElementById('main-sidebar').classList.add('collapsed');
-            document.body.classList.add('sidebar-collapsed');
-            document.getElementById('toggle-icon').setAttribute('data-lucide', 'chevrons-right');
-            lucide.createIcons();
-        }
-    });
-
-    function aiAssistant(mode) {
-        if (mode === 'chat') {
-            const drawer = document.getElementById('ai-chat-drawer');
-            drawer.classList.add('open');
-        }
-    }
-
-    function closeAIDrawer() {
-        document.getElementById('ai-chat-drawer').classList.remove('open');
-    }
-
-    function toggleMobileMenu() {
-        const sidebar = document.getElementById('main-sidebar');
-        sidebar.classList.toggle('mobile-open');
-    }
-</script>
-
-<!-- Mobile Sidebar Overlay -->
-<div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleMobileMenu()"></div>
-
-<!-- AI Chat Drawer -->
-<div id="ai-chat-drawer" class="ai-drawer">
-    <div class="ai-drawer-header">
-        <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <div class="ai-avatar-m"><i data-lucide="bot"></i></div>
-            <div>
-                <div style="font-weight: 700; font-size: 1rem;">UDRU AI Chatbot</div>
-                <div style="font-size: 0.75rem; color: #10b981;">● Online</div>
+        <div class="system-credit"
+            style="margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid rgba(255,255,255,0.05);">
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="display: flex; align-items: center; gap: 12px; opacity: 1;">
+                    <i data-lucide="copyright" class="system-credit-icon" style="color: white;"></i>
+                    <span style="font-size: 0.85rem; color: white; font-weight: 600;">2026 <strong
+                            style="color: var(--teal-primary);">phao2024</strong></span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px; opacity: 1;">
+                    <i data-lucide="shield-check" class="system-credit-icon" style="color: var(--teal-primary);"></i>
+                    <span
+                        style="font-size: 0.85rem; color: var(--teal-primary); font-weight: 800;">prapakorn1.1.0</span>
+                </div>
             </div>
         </div>
-        <button onclick="closeAIDrawer()" style="background:none; border:none; color: white; cursor:pointer;">
-            <i data-lucide="x"></i>
-        </button>
+
     </div>
-    <div class="ai-drawer-body" id="ai-chat-messages">
-        <div class="ai-msg ai-msg-bot">สวัสดีครับ! ผมเป็นผู้ช่วยอัจฉริยะ UDRU วันนี้มีอะไรให้ผมช่วยสืบค้น
-            หรือสงสัยเรื่องไหนสอบถามได้ทันทีครับ</div>
-    </div>
-    <div class="ai-drawer-footer">
-        <form onsubmit="sendDrawerMessage(event)">
-            <input type="text" id="ai-drawer-input" placeholder="พิมพ์คำถามของคุณ..." autocomplete="off">
-            <button type="submit"><i data-lucide="send"></i></button>
-        </form>
-    </div>
-</div>
+
+</aside>
 
 <style>
+    /* Premium Sidebar Footer Styles */
+    .sidebar.collapsed .footer-text {
+        display: none;
+    }
+
+    .sidebar.collapsed .system-credit {
+        padding: 1.25rem 0 !important;
+        display: flex;
+        justify-content: center;
+    }
+
+    .sidebar.collapsed .credit-content div {
+        justify-content: center;
+    }
+
+    /* System credit icons — matching 22px baseline */
+    .system-credit-icon,
+    .system-credit-icon svg {
+        width: 22px !important;
+        height: 22px !important;
+        stroke-width: 2 !important;
+        flex-shrink: 0;
+    }
+
     .ai-drawer {
         position: fixed;
         right: -400px;
@@ -367,6 +307,154 @@ if (is_logged_in()) {
     }
 </style>
 
+<!-- Mobile Top Bar (Global) -->
+<div class="mobile-top-bar">
+    <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <div class="mobile-logo-box">
+            <i data-lucide="book-open" style="width: 18px;"></i>
+        </div>
+        <span class="mobile-brand-name">UDRU Wisdom</span>
+    </div>
+    <button onclick="toggleMobileMenu()" class="mobile-menu-btn">
+        <i data-lucide="menu"></i>
+    </button>
+</div>
+
+<!-- Global AI Assistant UI -->
+<div class="ai-float-btn-container">
+    <button class="ai-float-btn" onclick="aiAssistant('chat')">
+        <i data-lucide="bot-message-square" style="width: 28px; height: 28px;"></i>
+    </button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+    // Theme Manager Script
+    (function () {
+        const savedTheme = localStorage.getItem('theme-primary');
+        const isDarkMode = localStorage.getItem('theme-dark-mode') === 'true';
+
+        if (savedTheme) {
+            document.documentElement.style.setProperty('--primary', savedTheme);
+            document.documentElement.style.setProperty('--teal-primary', `hsl(${savedTheme})`);
+        }
+
+        if (isDarkMode) {
+            document.documentElement.classList.add('dark-mode');
+            // Basic dark mode overrides if not in CSS
+            document.documentElement.style.setProperty('--background', '222 47% 11%');
+            document.documentElement.style.setProperty('--foreground', '210 40% 98%');
+            document.documentElement.style.setProperty('--card', '217 33% 17%');
+            document.documentElement.style.setProperty('--border', '217 33% 25%');
+            document.documentElement.style.setProperty('--muted', '217 33% 20%');
+        }
+    })();
+
+    function toggleSidebar() {
+        const sidebar = document.getElementById('main-sidebar');
+        const body = document.body;
+        const icon = document.getElementById('toggle-icon');
+
+        sidebar.classList.toggle('collapsed');
+        body.classList.toggle('sidebar-collapsed');
+
+        // Remove initial class if present
+        document.documentElement.classList.remove('sidebar-collapsed-init');
+
+        const isCollapsed = sidebar.classList.contains('collapsed');
+
+        // Update icon
+        if (isCollapsed) {
+            icon.setAttribute('data-lucide', 'chevrons-right');
+            localStorage.setItem('sidebarCollapsed', 'true');
+            document.cookie = "sidebarCollapsed=true; path=/; max-age=31536000";
+        } else {
+            icon.setAttribute('data-lucide', 'chevrons-left');
+            localStorage.setItem('sidebarCollapsed', 'false');
+            document.cookie = "sidebarCollapsed=false; path=/; max-age=31536000";
+        }
+        lucide.createIcons();
+    }
+
+    // Restore sidebar state on page load
+    document.addEventListener('DOMContentLoaded', function () {
+        const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true' ||
+            document.cookie.match(/sidebarCollapsed=true/);
+
+        if (isCollapsed) {
+            document.getElementById('main-sidebar').classList.add('collapsed');
+            document.body.classList.add('sidebar-collapsed');
+            document.getElementById('toggle-icon').setAttribute('data-lucide', 'chevrons-right');
+            lucide.createIcons();
+        }
+    });
+
+    function aiAssistant(mode) {
+        if (mode === 'chat') {
+            const drawer = document.getElementById('ai-chat-drawer');
+            drawer.classList.add('open');
+        }
+    }
+
+    function closeAIDrawer() {
+        document.getElementById('ai-chat-drawer').classList.remove('open');
+    }
+
+    function toggleMobileMenu() {
+        const sidebar = document.getElementById('main-sidebar');
+        sidebar.classList.toggle('mobile-open');
+    }
+
+    function toggleNotifications(event) {
+        if (event) event.stopPropagation();
+        const dropdown = document.getElementById('notif-dropdown');
+        if (dropdown) dropdown.classList.toggle('show');
+
+        // Close dropdown when clicking outside
+        if (dropdown && dropdown.classList.contains('show')) {
+            const closeHandler = (e) => {
+                if (!dropdown.contains(e.target) && !e.target.closest('.notification-bell-btn')) {
+                    dropdown.classList.remove('show');
+                    document.removeEventListener('click', closeHandler);
+                }
+            };
+            setTimeout(() => {
+                document.addEventListener('click', closeHandler);
+            }, 10);
+        }
+    }
+</script>
+
+<!-- Mobile Sidebar Overlay -->
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleMobileMenu()"></div>
+
+<!-- AI Chat Drawer -->
+<div id="ai-chat-drawer" class="ai-drawer">
+    <div class="ai-drawer-header">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div class="ai-avatar-m"><i data-lucide="bot"></i></div>
+            <div>
+                <div style="font-weight: 700; font-size: 1rem;">UDRU AI Chatbot</div>
+                <div style="font-size: 0.75rem; color: #10b981;">● Online</div>
+            </div>
+        </div>
+        <button onclick="closeAIDrawer()" style="background:none; border:none; color: white; cursor:pointer;">
+            <i data-lucide="x"></i>
+        </button>
+    </div>
+    <div class="ai-drawer-body" id="ai-chat-messages">
+        <div class="ai-msg ai-msg-bot">สวัสดีครับ! ผมเป็นผู้ช่วยอัจฉริยะ UDRU วันนี้มีอะไรให้ผมช่วยสืบค้น
+            หรือสงสัยเรื่องไหนสอบถามได้ทันทีครับ</div>
+    </div>
+    <div class="ai-drawer-footer">
+        <form onsubmit="sendDrawerMessage(event)">
+            <input type="text" id="ai-drawer-input" placeholder="พิมพ์คำถามของคุณ..." autocomplete="off">
+            <button type="submit"><i data-lucide="send"></i></button>
+        </form>
+    </div>
+</div>
+
 <script>
     function sendDrawerMessage(e) {
         e.preventDefault();
@@ -391,3 +479,60 @@ if (is_logged_in()) {
         }, 1000);
     }
 </script>
+
+<!-- Notification Dropdown Component -->
+<?php
+function render_notification_component($unread_count = 0)
+{
+    global $sidebar_pdo;
+    $previews = [];
+    if (is_logged_in()) {
+        $stmt = $sidebar_pdo->prepare("SELECT message, created_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 3");
+        $stmt->execute([$_SESSION['user_id']]);
+        $previews = $stmt->fetchAll();
+    }
+    ?>
+    <div class="notification-bell-container">
+        <div class="notification-bell-btn" onclick="toggleNotifications(event)">
+            <i data-lucide="bell" style="width: 22px; height: 22px;"></i>
+            <?php if ($unread_count > 0): ?>
+                <span class="bell-badge"><?php echo $unread_count; ?></span>
+            <?php endif; ?>
+        </div>
+
+        <div class="notification-dropdown" id="notif-dropdown">
+            <div class="notif-header">
+                <h3>การแจ้งเตือน</h3>
+                <?php if ($unread_count > 0): ?>
+                    <span
+                        style="font-size: 0.7rem; background: rgba(20, 184, 166, 0.1); color: var(--teal-primary); padding: 2px 8px; border-radius: 100px; font-weight: 700;">ใหม่
+                        <?php echo $unread_count; ?></span>
+                <?php endif; ?>
+            </div>
+            <div class="notif-body">
+                <?php if (empty($previews)): ?>
+                    <div class="notif-empty">
+                        <i data-lucide="bell-off" style="width: 40px; height: 40px; margin-bottom: 0.75rem; opacity: 0.5;"></i>
+                        <p style="font-size: 0.8125rem;">ไม่มีการแจ้งเตือนใหม่</p>
+                    </div>
+                <?php else: ?>
+                    <?php foreach ($previews as $n): ?>
+                        <a href="notifications.php" class="notif-item">
+                            <div class="notif-icon"><i data-lucide="message-circle" style="width: 16px;"></i></div>
+                            <div class="notif-content">
+                                <div class="notif-text"><?php echo htmlspecialchars($n['message']); ?></div>
+                                <div class="notif-time"><?php echo date('d M H:i', strtotime($n['created_at'])); ?></div>
+                            </div>
+                        </a>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+            <div class="notif-footer">
+                <a href="notifications.php">ดูการแจ้งเตือนทั้งหมด</a>
+            </div>
+        </div>
+    </div>
+    <?php
+}
+
+?>

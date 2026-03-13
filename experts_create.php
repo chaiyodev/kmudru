@@ -27,6 +27,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $pdo->prepare("UPDATE users SET specialty = ?, bio = ?, department = ?, role = 'contributor' WHERE id = ?");
         $stmt->execute([$specialty, $bio, $department, $user_id]);
         $message = "ลงทะเบียนข้อมูลผู้เชี่ยวชาญเรียบร้อยแล้ว! ตอนนี้คุณสามารถแบ่งปันความรู้ได้เต็มรูปแบบ";
+
+        // Handle Avatar Upload
+        if (isset($_FILES['avatar']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
+            $fileTmpPath = $_FILES['avatar']['tmp_name'];
+            $fileName = $_FILES['avatar']['name'];
+            $fileNameCmps = explode(".", $fileName);
+            $fileExtension = strtolower(end($fileNameCmps));
+            $newFileName = 'expert_' . uniqid() . '.' . $fileExtension;
+            $uploadFileDir = './uploads/avatars/';
+
+            if (!is_dir($uploadFileDir)) {
+                mkdir($uploadFileDir, 0777, true);
+            }
+
+            $dest_path = $uploadFileDir . $newFileName;
+            if (move_uploaded_file($fileTmpPath, $dest_path)) {
+                $stmt = $pdo->prepare("UPDATE users SET avatar = ? WHERE id = ?");
+                $stmt->execute([$newFileName, $user_id]);
+                $_SESSION['avatar'] = $newFileName;
+            }
+        }
+
+        // Refresh data
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+        $stmt->execute([$user_id]);
+        $user_data = $stmt->fetch();
+
     } catch (PDOException $e) {
         $error = "เกิดข้อผิดพลาด: " . $e->getMessage();
     }
@@ -79,22 +106,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php endif; ?>
 
             <div class="experts-form">
-                <form action="experts_create.php" method="POST">
+                <form action="experts_create.php" method="POST" enctype="multipart/form-data">
                     <div
-                        style="display: flex; gap: 2rem; align-items: center; margin-bottom: 3rem; padding-bottom: 2rem; border-bottom: 1px solid var(--border-color);">
-                        <div
-                            style="width: 100px; height: 100px; border-radius: 30px; background: var(--teal-primary); color: white; display:flex; align-items:center; justify-content:center; font-size: 2.5rem; font-weight: 800;">
-                            <?php echo strtoupper(substr($user_data['username'], 0, 1)); ?>
+                        style="text-align: center; margin-bottom: 2.5rem; padding-bottom: 2rem; border-bottom: 1px solid var(--border-color);">
+                        <div class="avatar-edit-container">
+                            <?php
+                            $avatar_url = !empty($user_data['avatar']) ? 'uploads/avatars/' . $user_data['avatar'] : '';
+                            $has_avatar = !empty($avatar_url) && file_exists(__DIR__ . '/' . $avatar_url);
+                            $initials = strtoupper(substr($user_data['username'], 0, 1));
+                            ?>
+                            <div class="avatar-preview-wrapper" id="avatar-preview"
+                                style="<?php echo $has_avatar ? "background-image: url('$avatar_url');" : ""; ?>">
+                                <?php if (!$has_avatar): ?>
+                                    <span id="avatar-initials"><?php echo $initials; ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <label for="avatar-input" class="avatar-edit-btn">
+                                <i data-lucide="camera" style="width: 20px; height: 20px;"></i>
+                            </label>
+                            <input type="file" name="avatar" id="avatar-input" class="hidden-file-input"
+                                accept="image/*" onchange="previewAvatar(this)">
                         </div>
-                        <div>
-                            <h3 style="font-size: 1.5rem; font-weight: 800;">
-                                <?php echo htmlspecialchars($user_data['full_name']); ?>
-                            </h3>
-                            <p style="color: hsl(var(--muted-foreground));">
-                                <?php echo htmlspecialchars($user_data['email']); ?>
-                            </p>
-                        </div>
+                        <h3 style="font-size: 1.5rem; font-weight: 800; margin-bottom: 0.25rem;">
+                            <?php echo htmlspecialchars($user_data['full_name']); ?>
+                        </h3>
+                        <p style="color: hsl(var(--muted-foreground)); font-size: 0.875rem;">
+                            <?php echo htmlspecialchars($user_data['email']); ?>
+                        </p>
                     </div>
+
 
                     <div class="form-group">
                         <label class="form-label">สาขาความเชี่ยวชาญ (Specialty)</label>
@@ -124,7 +164,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         </main>
     </div>
-    <script>lucide.createIcons();</script>
+    <script>
+        lucide.createIcons();
+
+        function previewAvatar(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    const preview = document.getElementById('avatar-preview');
+                    const initials = document.getElementById('avatar-initials');
+                    preview.style.backgroundImage = `url(${e.target.result})`;
+                    if (initials) initials.style.display = 'none';
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+    </script>
+
 </body>
 
 </html>

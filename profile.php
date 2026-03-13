@@ -35,6 +35,32 @@ if ($pdo) {
         $stmt = $pdo->prepare("SELECT c.*, t.title as course_title FROM certificates c JOIN trainings t ON c.course_id = t.id WHERE c.user_id = ? ORDER BY c.issued_at DESC");
         $stmt->execute([$user_id]);
         $certificates = $stmt->fetchAll();
+
+        // Handle Avatar Upload (if posted from this page or shared with experts_create)
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['avatar']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
+            $fileTmpPath = $_FILES['avatar']['tmp_name'];
+            $fileName = $_FILES['avatar']['name'];
+            $fileNameCmps = explode(".", $fileName);
+            $fileExtension = strtolower(end($fileNameCmps));
+            $newFileName = 'profile_' . uniqid() . '.' . $fileExtension;
+            $uploadFileDir = './uploads/avatars/';
+
+            if (!is_dir($uploadFileDir)) {
+                mkdir($uploadFileDir, 0777, true);
+            }
+
+            $dest_path = $uploadFileDir . $newFileName;
+            if (move_uploaded_file($fileTmpPath, $dest_path)) {
+                $stmt = $pdo->prepare("UPDATE users SET avatar = ? WHERE id = ?");
+                $stmt->execute([$newFileName, $user_id]);
+                $_SESSION['avatar'] = $newFileName;
+
+                // Refresh $user_info
+                $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+                $stmt->execute([$user_id]);
+                $user_info = $stmt->fetch();
+            }
+        }
     } catch (PDOException $e) {
     }
 }
@@ -145,7 +171,27 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
             <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem;">
                 <!-- Profile Sidebar -->
                 <div class="profile-card">
-                    <div class="profile-avatar"><?php echo strtoupper(substr($user_info['username'], 0, 2)); ?></div>
+                    <form action="profile.php" method="POST" enctype="multipart/form-data" id="avatar-form">
+                        <div class="avatar-edit-container">
+                            <?php
+                            $avatar_url = !empty($user_info['avatar']) ? 'uploads/avatars/' . $user_info['avatar'] : '';
+                            $has_avatar = !empty($avatar_url) && file_exists(__DIR__ . '/' . $avatar_url);
+                            $initials = strtoupper(substr($user_info['username'], 0, 1));
+                            ?>
+                            <div class="avatar-preview-wrapper" id="avatar-preview"
+                                style="<?php echo $has_avatar ? "background-image: url('$avatar_url');" : ""; ?>">
+                                <?php if (!$has_avatar): ?>
+                                    <span id="avatar-initials"><?php echo $initials; ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <label for="avatar-input" class="avatar-edit-btn">
+                                <i data-lucide="camera" style="width: 20px; height: 20px;"></i>
+                            </label>
+                            <input type="file" name="avatar" id="avatar-input" class="hidden-file-input"
+                                accept="image/*" onchange="submitAvatar()">
+                        </div>
+                    </form>
+
                     <h3 style="font-size: 1.5rem; font-weight: 800; margin-bottom: 0.25rem;">
                         <?php echo htmlspecialchars($user_info['full_name']); ?>
                     </h3>
@@ -280,7 +326,29 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
             </div>
         </main>
     </div>
-    <script>lucide.createIcons();</script>
+    <script>
+        lucide.createIcons();
+
+        function submitAvatar() {
+            const input = document.getElementById('avatar-input');
+            if (input.files && input.files[0]) {
+                // Show preview immediately for better UX
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    document.getElementById('avatar-preview').style.backgroundImage = `url(${e.target.result})`;
+                    const initials = document.getElementById('avatar-initials');
+                    if (initials) initials.style.display = 'none';
+                }
+                reader.readAsDataURL(input.files[0]);
+
+                // Submit form
+                setTimeout(() => {
+                    document.getElementById('avatar-form').submit();
+                }, 500);
+            }
+        }
+    </script>
+
 </body>
 
 </html>
