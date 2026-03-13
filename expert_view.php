@@ -33,6 +33,7 @@ $error = '';
 
 // Handle Updates
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_edit) {
+    verify_csrf_token($_POST['csrf_token'] ?? '');
     $full_name = trim($_POST['full_name']);
     $specialty = trim($_POST['specialty']);
     $bio = trim($_POST['bio']);
@@ -86,129 +87,11 @@ $latest_docs = $docs->fetchAll();
     <title>
         <?php echo htmlspecialchars($expert['full_name']); ?> | UDRU Wisdom
     </title>
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo filemtime('assets/css/style.css'); ?>">
     <link
         href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        .profile-header-premium {
-            background: white;
-            border-radius: 24px;
-            padding: 3rem;
-            display: flex;
-            gap: 3rem;
-            align-items: center;
-            border: 1px solid var(--border-color);
-            margin-bottom: 2rem;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
-        }
-
-        .profile-image-container {
-            position: relative;
-            flex-shrink: 0;
-        }
-
-        .profile-image-large {
-            width: 180px;
-            height: 180px;
-            border-radius: 40px;
-            background: var(--teal-primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 4rem;
-            font-weight: 800;
-            background-size: cover;
-            background-position: center;
-            border: 4px solid white;
-            box-shadow: 0 10px 30px rgba(20, 184, 166, 0.2);
-        }
-
-        .expert-stats-pill {
-            display: flex;
-            gap: 1rem;
-            margin-top: 1.5rem;
-        }
-
-        .stat-badge {
-            padding: 0.5rem 1rem;
-            background: #f1f5f9;
-            border-radius: 100px;
-            font-size: 0.8125rem;
-            font-weight: 600;
-            color: #475569;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .content-section {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 2rem;
-        }
-
-        .info-card {
-            background: white;
-            padding: 2rem;
-            border-radius: 20px;
-            border: 1px solid var(--border-color);
-            margin-bottom: 2rem;
-        }
-
-        .info-label {
-            font-size: 0.75rem;
-            font-weight: 800;
-            color: var(--teal-primary);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 0.75rem;
-            display: block;
-        }
-
-        .edit-overlay {
-            position: absolute;
-            bottom: -10px;
-            right: -10px;
-            background: white;
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-            border: 1px solid var(--border-color);
-            color: var(--teal-primary);
-        }
-
-        .modal-edit {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal-content {
-            background: white;
-            width: 90%;
-            max-width: 600px;
-            padding: 2.5rem;
-            border-radius: 24px;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-    </style>
+    <link rel="stylesheet" href="assets/css/expert.css">
 </head>
 
 <body>
@@ -234,10 +117,29 @@ $latest_docs = $docs->fetchAll();
             </header>
 
             <?php if ($message): ?>
-                <div
-                    style="background: #10b98110; color: #10b981; padding: 1rem 1.5rem; border-radius: 12px; margin-bottom: 2rem; border: 1px solid #10b98120;">
-                    <?php echo $message; ?>
-                </div>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'อัปเดตสำเร็จ!',
+                            text: '<?php echo addslashes($message); ?>',
+                            confirmButtonColor: 'var(--teal-primary)'
+                        });
+                    });
+                </script>
+            <?php endif; ?>
+
+            <?php if ($error): ?>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'เกิดข้อผิดพลาด',
+                            text: '<?php echo addslashes($error); ?>',
+                            confirmButtonColor: 'var(--teal-primary)'
+                        });
+                    });
+                </script>
             <?php endif; ?>
 
             <div class="profile-header-premium">
@@ -338,6 +240,7 @@ $latest_docs = $docs->fetchAll();
                 </div>
 
                 <form action="expert_view.php?id=<?php echo $expert_id; ?>" method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                     <div class="form-group" style="margin-bottom: 1.5rem;">
                         <label class="form-label">รูปประจำตัว</label>
                         <input type="file" name="avatar" class="form-input">

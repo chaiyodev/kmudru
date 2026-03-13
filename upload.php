@@ -12,6 +12,7 @@ $message = '';
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
+    verify_csrf_token($_POST['csrf_token'] ?? '');
     $title = $_POST['title'];
     $category_id = $_POST['category_id'];
     $description = $_POST['description'];
@@ -26,12 +27,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
         $file_name = time() . '_' . basename($_FILES['file']['name']);
         $target_file = $upload_dir . $file_name;
 
-        if (move_uploaded_file($_FILES['file']['tmp_name'], $target_file)) {
+        // Strict file type validation
+        $allowed_extensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png'];
+        $file_ext = strtolower(pathinfo($_FILES['file']['name'], PATHINFO_EXTENSION));
+
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime_type = finfo_file($finfo, $_FILES['file']['tmp_name']);
+        finfo_close($finfo);
+
+        $allowed_mime_types = [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-powerpoint',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'image/jpeg',
+            'image/png'
+        ];
+
+        if (!in_array($file_ext, $allowed_extensions) || !in_array($mime_type, $allowed_mime_types)) {
+            $error = "ไฟล์ที่อัปโหลดไม่ได้รับอนุญาตให้ใช้งาน (รองรับเฉพาะ PDF, Word, Excel, PPT, JPG, PNG)";
+        } else if (move_uploaded_file($_FILES['file']['tmp_name'], $target_file)) {
             try {
                 $pdo->beginTransaction();
 
                 // Insert Document
-                $stmt = $pdo->prepare("INSERT INTO documents (title, content, category_id, user_id, type, tags) VALUES (?, ?, ?, ?, 'document', ?)");
+                $stmt = $pdo->prepare("INSERT INTO documents (title, content, category_id, user_id, type, tags, status) VALUES (?, ?, ?, ?, 'document', ?, 'published')");
                 $stmt->execute([$title, $description, $category_id, $user_id, $tags]);
                 $doc_id = $pdo->lastInsertId();
 
@@ -40,6 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
                 $stmt->execute([$doc_id, $_FILES['file']['name'], $target_file, $_FILES['file']['type'], $_FILES['file']['size']]);
 
                 $pdo->commit();
+                log_activity('document_upload', 'document', "Title: $title | File: " . $_FILES['file']['name']);
                 $message = "อัปโหลดเอกสารเรียบร้อยแล้ว!";
             } catch (Exception $e) {
                 $pdo->rollBack();
@@ -65,89 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        .upload-zone {
-            border: 2px dashed var(--border-color);
-            border-radius: 1rem;
-            padding: 3rem;
-            text-align: center;
-            background: hsl(var(--muted) / 0.5);
-            transition: var(--transition-base);
-            cursor: pointer;
-            margin-bottom: 2rem;
-        }
-
-        .upload-zone:hover,
-        .upload-zone.drag-active {
-            border-color: var(--teal-primary);
-            background: hsl(var(--primary) / 0.05);
-        }
-
-        .upload-icon {
-            width: 48px;
-            height: 48px;
-            color: var(--teal-primary);
-            margin: 0 auto 1rem;
-        }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .form-label {
-            display: block;
-            font-size: 0.875rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            color: hsl(var(--foreground));
-        }
-
-        .form-input,
-        .form-select,
-        .form-textarea {
-            width: 100%;
-            padding: 0.75rem 1rem;
-            border-radius: 0.5rem;
-            border: 1px solid var(--border-color);
-            font-family: inherit;
-            font-size: 0.875rem;
-            outline: none;
-            transition: var(--transition-base);
-        }
-
-        .form-input:focus,
-        .form-select:focus,
-        .form-textarea:focus {
-            border-color: var(--teal-primary);
-            box-shadow: 0 0 0 2px hsl(var(--primary) / 0.1);
-        }
-
-        .form-textarea {
-            min-height: 120px;
-            resize: vertical;
-        }
-
-        .info-card {
-            background: white;
-            border-radius: 0.75rem;
-            border: 1px solid var(--border-color);
-            padding: 1.5rem;
-        }
-
-        .info-item {
-            display: flex;
-            gap: 0.75rem;
-            margin-bottom: 1rem;
-            font-size: 0.8125rem;
-            color: hsl(var(--muted-foreground));
-        }
-
-        .info-item i {
-            color: var(--teal-primary);
-            flex-shrink: 0;
-            margin-top: 2px;
-        }
-    </style>
+    <link rel="stylesheet" href="assets/css/upload.css">
 </head>
 
 <body>
@@ -164,21 +106,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
             </header>
 
             <?php if ($message): ?>
-                <div
-                    style="background: hsl(142 76% 36% / 0.1); color: hsl(142 76% 36%); padding: 1rem; border-radius: 0.5rem; margin-bottom: 2rem; border: 1px solid hsl(142 76% 36% / 0.2);">
-                    <?php echo $message; ?>
-                </div>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'สำเร็จ!',
+                            text: '<?php echo addslashes($message); ?>',
+                            confirmButtonColor: 'var(--teal-primary)'
+                        }).then(() => {
+                            window.location.href = 'browse.php';
+                        });
+                    });
+                </script>
             <?php endif; ?>
 
             <?php if ($error): ?>
-                <div
-                    style="background: hsl(0 84% 60% / 0.1); color: hsl(0 84% 60%); padding: 1rem; border-radius: 0.5rem; margin-bottom: 2rem; border: 1px solid hsl(0 84% 60% / 0.2);">
-                    <?php echo $error; ?>
-                </div>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'ขออภัย...',
+                            text: '<?php echo addslashes($error); ?>',
+                            confirmButtonColor: 'var(--teal-primary)'
+                        });
+                    });
+                </script>
             <?php endif; ?>
 
             <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2.5rem;">
                 <form action="upload.php" method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                     <div id="drop-zone" class="upload-zone">
                         <div class="upload-icon"><i data-lucide="upload-cloud"></i></div>
                         <h3 style="font-weight: 700; margin-bottom: 0.5rem;">คลิกเพื่อเลือกไฟล์ หรือลากมาวางที่นี่</h3>

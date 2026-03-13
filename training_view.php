@@ -39,6 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_lesson'])) {
     try {
         $stmt = $pdo->prepare("INSERT IGNORE INTO course_progress (user_id, lesson_id, course_id) VALUES (?, ?, ?)");
         $stmt->execute([$_SESSION['user_id'], $lesson_to_complete, $id]);
+        log_activity('lesson_complete', 'training', "Course ID: $id | Lesson ID: $lesson_to_complete");
 
         // Find next lesson
         $next_lesson_id = 0;

@@ -59,7 +59,7 @@ $users_list = $pdo->query("SELECT id, full_name, username FROM users ORDER BY fu
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Professional Activity Audit | UDRU Wisdom</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo filemtime('assets/css/style.css'); ?>">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>

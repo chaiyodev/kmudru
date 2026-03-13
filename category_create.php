@@ -7,6 +7,7 @@ $message = '';
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
+    verify_csrf_token($_POST['csrf_token'] ?? '');
     $name = trim($_POST['name']);
     $description = trim($_POST['description']);
     $icon = $_POST['icon'] ?? 'folder';
@@ -152,6 +153,7 @@ $categories = $pdo->query("SELECT c.*, (SELECT COUNT(*) FROM documents WHERE cat
                 </h3>
 
                 <form action="category_create.php" method="POST">
+                    <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                     <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1.5rem;">
                         <div class="form-group">
                             <label class="form-label">ชื่อหมวดหมู่</label>

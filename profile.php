@@ -38,6 +38,7 @@ if ($pdo) {
 
         // Handle Avatar Upload (if posted from this page or shared with experts_create)
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['avatar']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
+            verify_csrf_token($_POST['csrf_token'] ?? '');
             $fileTmpPath = $_FILES['avatar']['tmp_name'];
             $fileName = $_FILES['avatar']['name'];
             $fileNameCmps = explode(".", $fileName);
@@ -53,6 +54,7 @@ if ($pdo) {
             if (move_uploaded_file($fileTmpPath, $dest_path)) {
                 $stmt = $pdo->prepare("UPDATE users SET avatar = ? WHERE id = ?");
                 $stmt->execute([$newFileName, $user_id]);
+                log_activity('avatar_upload', 'user', "New avatar: $newFileName");
                 $_SESSION['avatar'] = $newFileName;
 
                 // Refresh $user_info
@@ -79,7 +81,7 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>โปรไฟล์ของฉัน | UDRU Wisdom</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo filemtime('assets/css/style.css'); ?>">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
@@ -172,6 +174,7 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                 <!-- Profile Sidebar -->
                 <div class="profile-card">
                     <form action="profile.php" method="POST" enctype="multipart/form-data" id="avatar-form">
+                        <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                         <div class="avatar-edit-container">
                             <?php
                             $avatar_url = !empty($user_info['avatar']) ? 'uploads/avatars/' . $user_info['avatar'] : '';

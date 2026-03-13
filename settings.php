@@ -16,6 +16,7 @@ $user_data = $stmt->fetch();
 
 $message = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf_token($_POST['csrf_token'] ?? '');
     $full_name = $_POST['full_name'];
     $email = $_POST['email'];
     $dept = $_POST['department'];
@@ -36,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ตั้งค่า | UDRU Wisdom</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo filemtime('assets/css/style.css'); ?>">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
@@ -241,6 +242,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <section id="section-profile">
                         <h3 class="settings-section-title"><i data-lucide="user"></i> ข้อมูลส่วนตัว</h3>
                         <form id="profile-form" action="settings.php" method="POST">
+                            <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                             <div class="form-group">
                                 <label class="form-label">ชื่อ-นามสกุล</label>
                                 <input type="text" name="full_name" class="form-input"

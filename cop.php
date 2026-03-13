@@ -28,104 +28,11 @@ if ($pdo) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ชุมชน CoP | UDRU Wisdom</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo filemtime('assets/css/style.css'); ?>">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        .cop-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-            gap: 2rem;
-        }
-
-        .cop-card {
-            background: white;
-            border-radius: 1.25rem;
-            border: 1px solid var(--border-color);
-            overflow: hidden;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            cursor: pointer;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-        }
-
-        .cop-card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);
-            border-color: var(--teal-primary);
-        }
-
-        .cop-card-banner {
-            height: 140px;
-            position: relative;
-            background: #14b8a6;
-            overflow: hidden;
-        }
-
-        .cop-card-avatar {
-            width: 70px;
-            height: 70px;
-            border-radius: 1.25rem;
-            background: white;
-            border: 4px solid white;
-            position: absolute;
-            left: 1.5rem;
-            bottom: -35px;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2rem;
-            z-index: 2;
-        }
-
-        .cop-status-tag {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            padding: 4px 10px;
-            border-radius: 100px;
-            background: rgba(255, 255, 255, 0.2);
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: white;
-            font-size: 0.65rem;
-            font-weight: 700;
-            text-transform: uppercase;
-        }
-
-        .category-tag {
-            padding: 4px 10px;
-            border-radius: 6px;
-            background: #f1f5f9;
-            color: #64748b;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        .btn-join {
-            width: 100%;
-            padding: 0.75rem;
-            border-radius: 0.75rem;
-            border: none;
-            font-weight: 700;
-            background: #f1f5f9;
-            color: #475569;
-            transition: 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-
-        .cop-card:hover .btn-join {
-            background: var(--teal-primary);
-            color: white;
-        }
-    </style>
+    <link rel="stylesheet" href="assets/css/cop.css">
 </head>
 
 <body>

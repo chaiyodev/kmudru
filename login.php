@@ -18,10 +18,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $login_result = login($username, $password);
         if ($login_result === true) {
             session_regenerate_id(true); // Security: Prevent session fixation
+            log_activity('login_success', 'user', "User: $username");
             header("Location: index.php");
             exit;
         } else {
             $error = is_string($login_result) ? $login_result : 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
+            log_activity('login_failure', 'user', "User: $username | Error: $error");
         }
     } catch (Exception $e) {
         $error = $e->getMessage();
@@ -40,6 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@400;500;600;700&display=swap"
         rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         body {
             background-color: #0f172a;
@@ -164,14 +167,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             style="color: #64748b; margin-bottom: 2.5rem; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-size: 0.75rem;">
             Knowledge Center Access</p>
 
-        <?php if ($error): ?>
-            <div class="error-msg">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <i data-lucide="alert-circle" style="width: 18px;"></i>
-                    <span><?php echo $error; ?></span>
-                </div>
-            </div>
-        <?php endif; ?>
+        <script>
+            <?php if ($error): ?>
+                Swal.fire({
+                    icon: 'error',
+                    title: 'ข้อผิดพลาด',
+                    text: '<?php echo htmlspecialchars(str_replace('\'', '\\\'', $error)); ?>',
+                    confirmButtonColor: 'var(--teal-primary)',
+                    background: '#1e293b',
+                    color: '#f8fafc',
+                    customClass: {
+                        popup: 'animated tada'
+                    }
+                });
+            <?php endif; ?>
+        </script>
 
         <a href="auth_google.php" class="btn-sso-google"
             style="display: flex; align-items: center; justify-content: center; gap: 0.75rem; width: 100%; padding: 1rem; background: white; border: none; border-radius: 16px; color: #1e293b; text-decoration: none; font-weight: 700; font-size: 1rem; margin-bottom: 2rem; transition: all 0.3s; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">

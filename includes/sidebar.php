@@ -424,6 +424,28 @@ if (is_logged_in()) {
             }, 10);
         }
     }
+    // Global Status Toast Handler
+    document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('status')) {
+            const status = urlParams.get('status');
+            if (status === 'success' || status === 'created') {
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: 'ดำเนินการสำเร็จ',
+                    showConfirmButton: false,
+                    timer: 3000,
+                    timerProgressBar: true,
+                    didOpen: (toast) => {
+                        toast.onmouseenter = Swal.stopTimer;
+                        toast.onmouseleave = Swal.resumeTimer;
+                    }
+                });
+            }
+        }
+    });
 </script>
 
 <!-- Mobile Sidebar Overlay -->

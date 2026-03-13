@@ -12,6 +12,7 @@ $message = '';
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
+    verify_csrf_token($_POST['csrf_token'] ?? '');
     $title = $_POST['title'];
     $category_id = $_POST['category_id'];
     $content = $_POST['content'];
@@ -148,6 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
 
             <div class="qa-form-container">
                 <form action="qa_ask.php" method="POST">
+                    <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                     <div class="form-group">
                         <label class="form-label">หัวข้อคำถามของคุณ</label>
                         <input type="text" name="title" class="form-input-lg"

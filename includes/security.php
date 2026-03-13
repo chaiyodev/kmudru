@@ -37,7 +37,7 @@ function verify_csrf_token($token)
     return true;
 }
 
-// 4. Input Sanitization (Basic)
+// 5. Input Sanitization (Basic)
 function sanitize_input($data)
 {
     if (is_array($data)) {

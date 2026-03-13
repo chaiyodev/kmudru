@@ -21,10 +21,14 @@ $stats['total_courses'] = $pdo->query("SELECT COUNT(*) FROM trainings")->fetchCo
 if (is_logged_in()) {
     $uid = $_SESSION['user_id'];
     // Learning (Started but not finished) - Simplified logic: Has record in progress
-    $stats['learning'] = $pdo->query("SELECT COUNT(DISTINCT course_id) FROM course_progress WHERE user_id = $uid")->fetchColumn();
+    $stmt_learning = $pdo->prepare("SELECT COUNT(DISTINCT course_id) FROM course_progress WHERE user_id = ?");
+    $stmt_learning->execute([$uid]);
+    $stats['learning'] = $stmt_learning->fetchColumn();
     
     // Completed (Have certificate)
-    $stats['completed'] = $pdo->query("SELECT COUNT(*) FROM certificates WHERE user_id = $uid")->fetchColumn();
+    $stmt_comp = $pdo->prepare("SELECT COUNT(*) FROM certificates WHERE user_id = ?");
+    $stmt_comp->execute([$uid]);
+    $stats['completed'] = $stmt_comp->fetchColumn();
     
     // Total Hours (Sum duration of completed courses - Estimate)
     // This is complex because duration is string (e.g., '2 ชม.'). simpler to manually set for demo or parse integers.
@@ -70,99 +74,10 @@ $categories = $pdo->query("SELECT * FROM categories")->fetchAll();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard การฝึกอบรม | UDRU Wisdom</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo filemtime('assets/css/style.css'); ?>">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        /* Dashboard Cards */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1.5rem;
-            margin-bottom: 3rem;
-        }
-        
-        .stat-card {
-            background: white;
-            border-radius: 1rem;
-            padding: 1.5rem;
-            border: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-            transition: var(--transition-base);
-        }
-        
-        .stat-card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
-        
-        .stat-icon {
-            width: 48px; height: 48px;
-            border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            margin-bottom: 0.5rem;
-            font-size: 1.5rem;
-        }
-
-        /* Course Cards Premium */
-        .course-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-            gap: 1.5rem;
-        }
-
-        .course-card {
-            background: white;
-            border-radius: 1rem;
-            border: 1px solid var(--border-color);
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            text-decoration: none;
-            color: inherit;
-            transition: all 0.2s ease;
-        }
-        
-        .course-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        }
-
-        .course-thumb {
-            height: 180px;
-            background: hsl(var(--muted));
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: hsl(var(--muted-foreground));
-        }
-        
-        .course-cat-badge {
-            position: absolute;
-            top: 1rem; left: 1rem;
-            background: rgba(255,255,255,0.9);
-            color: #0f172a;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 700;
-        }
-        
-        .progress-track {
-            height: 6px;
-            background: #e2e8f0;
-            border-radius: 3px;
-            overflow: hidden;
-            margin-top: auto;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background: var(--teal-primary);
-            border-radius: 3px;
-        }
-    </style>
+    <link rel="stylesheet" href="assets/css/training.css">
 </head>
 
 <body>

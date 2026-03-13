@@ -79,11 +79,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
         if ($_POST['action'] === 'join') {
             $stmt = $pdo->prepare("INSERT IGNORE INTO community_members (community_id, user_id, role) VALUES (?, ?, 'member')");
             $stmt->execute([$id, $user_id]);
+            log_activity('cop_join', 'community', "CoP ID: $id");
             header("Location: cop_view.php?id=$id&status=joined");
             exit;
         } elseif ($_POST['action'] === 'leave') {
             $stmt = $pdo->prepare("DELETE FROM community_members WHERE community_id = ? AND user_id = ?");
             $stmt->execute([$id, $user_id]);
+            log_activity('cop_leave', 'community', "CoP ID: $id");
             header("Location: cop_view.php?id=$id&status=left");
             exit;
         } elseif ($_POST['action'] === 'add_post') {
@@ -91,6 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
             if (!empty($content)) {
                 $stmt = $pdo->prepare("INSERT INTO community_posts (community_id, user_id, content) VALUES (?, ?, ?)");
                 $stmt->execute([$id, $user_id, $content]);
+                log_activity('cop_post', 'community', "CoP ID: $id");
                 header("Location: cop_view.php?id=$id&tab=discussions&status=posted");
                 exit;
             }
@@ -109,6 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
                 if (move_uploaded_file($_FILES['file']['tmp_name'], $dest_path)) {
                     $stmt = $pdo->prepare("INSERT INTO community_resources (community_id, user_id, title, file_path, file_type) VALUES (?, ?, ?, ?, ?)");
                     $stmt->execute([$id, $user_id, $title, $dest_path, $file_ext]);
+                    log_activity('cop_resource_upload', 'community', "CoP ID: $id | Title: $title");
                     header("Location: cop_view.php?id=$id&tab=resources&status=uploaded");
                     exit;
                 }
@@ -167,264 +171,15 @@ if ($tab === 'discussions') {
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="assets/css/cop.css">
     <style>
         .cop-hero {
-            position: relative;
-            border-radius: 1.5rem;
-            overflow: hidden;
-            padding: 4rem 3rem;
-            color: white;
-            margin-bottom: 2rem;
-            background:
-                <?php echo $cop['color_theme']; ?>
-            ;
+            background: <?php echo $cop['color_theme']; ?>;
             <?php if ($cop['cover_image']): ?>
                 background-image: linear-gradient(to right, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.2)), url('<?php echo $cop['cover_image']; ?>');
                 background-size: cover;
                 background-position: center;
             <?php endif; ?>
-        }
-
-        .cop-hero-content {
-            position: relative;
-            z-index: 2;
-            max-width: 800px;
-        }
-
-        .glass-badge {
-            background: rgba(255, 255, 255, 0.2);
-            backdrop-filter: blur(8px);
-            padding: 4px 12px;
-            border-radius: 100px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .cop-tabs {
-            display: flex;
-            gap: 1rem;
-            background: white;
-            padding: 0.5rem;
-            border-radius: 1rem;
-            border: 1px solid var(--border-color);
-            margin-bottom: 1.5rem;
-        }
-
-        .ai-search-bar {
-            background: linear-gradient(90deg, #f8fafc 0%, #ffffff 100%);
-            border: 2px solid #e2e8f0;
-            border-radius: 1.25rem;
-            padding: 1rem 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-            transition: 0.3s;
-        }
-
-        .ai-search-bar:focus-within {
-            border-color: #6366f1;
-            box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.1);
-        }
-
-        .tab-btn {
-            flex: 1;
-            padding: 0.85rem;
-            border-radius: 0.75rem;
-            border: none;
-            background: transparent;
-            color: #64748b;
-            font-weight: 600;
-            cursor: pointer;
-            transition: 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            text-decoration: none;
-        }
-
-        .tab-btn:hover {
-            background: #f8fafc;
-            color: #0f172a;
-        }
-
-        .tab-btn.active {
-            background: var(--teal-primary);
-            color: white;
-            box-shadow: 0 10px 15px -3px rgba(20, 184, 166, 0.25);
-        }
-
-        .tab-btn.active span {
-            background: rgba(255, 255, 255, 0.2) !important;
-            color: white !important;
-        }
-
-        .form-card {
-            background: white;
-            border-radius: 1rem;
-            border: 1px solid var(--border-color);
-            padding: 2rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .member-actions {
-            display: flex;
-            gap: 1rem;
-            margin-top: 1.5rem;
-        }
-
-        .btn-action {
-            padding: 0.65rem 1.25rem;
-            border-radius: 0.75rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            cursor: pointer;
-            backdrop-filter: blur(10px);
-            transition: 0.2s;
-            font-size: 0.875rem;
-        }
-
-        .btn-action:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        .btn-action.primary {
-            background: white;
-            color: #0f172a;
-            border: none;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-        }
-
-        .cop-hero-flex {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-            gap: 2rem;
-        }
-
-
-        .quick-stat-box {
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 1rem;
-            padding: 1.25rem;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-            min-width: 280px;
-        }
-
-        .stat-item {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .stat-item .val {
-            font-size: 1.25rem;
-            font-weight: 800;
-            color: white;
-        }
-
-        .stat-item .lbl {
-            font-size: 0.75rem;
-            opacity: 0.8;
-            font-weight: 600;
-        }
-
-        /* Discussion Thread */
-        .thread-card {
-            background: white;
-            border-radius: 1rem;
-            border: 1px solid var(--border-color);
-            padding: 1.5rem;
-            margin-bottom: 1.25rem;
-            transition: 0.2s;
-            border-left: 4px solid transparent;
-        }
-
-        .thread-card:hover {
-            border-color: #e2e8f0;
-            border-left-color: var(--teal-primary);
-            transform: translateX(4px);
-        }
-
-        .avatar-circle {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: #f1f5f9;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            color: #64748b;
-        }
-
-        .post-tool-btn {
-            background: #f8fafc;
-            border: 1px solid #f1f5f9;
-            color: #64748b;
-            padding: 8px;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: 0.2s;
-            display: flex;
-            align-items: center;
-        }
-
-        .post-tool-btn:hover {
-            background: #f1f5f9;
-            color: var(--teal-primary);
-            border-color: #e2e8f0;
-        }
-
-        /* Modal Styles */
-        .modal-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
-
-        .modal-card {
-            background: white;
-            border-radius: 1.5rem;
-            width: 100%;
-            max-width: 500px;
-            padding: 2.5rem;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-            animation: modalEnter 0.3s ease-out;
-        }
-
-        @keyframes modalEnter {
-            from {
-                opacity: 0;
-                transform: scale(0.95);
-            }
-
-            to {
-                opacity: 1;
-                transform: scale(1);
-            }
         }
     </style>
 </head>

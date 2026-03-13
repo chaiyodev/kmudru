@@ -13,6 +13,7 @@ if ($course_id === 0 || !is_logged_in()) {
 // Handle POST: Add Question
 $message = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['question'])) {
+    verify_csrf_token($_POST['csrf_token'] ?? '');
     $question = $_POST['question'];
     $options = json_encode([
         'A' => $_POST['option_a'],
@@ -30,7 +31,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['question'])) {
 // Handle Delete
 if (isset($_GET['delete'])) {
     $q_id = (int) $_GET['delete'];
-    $pdo->exec("DELETE FROM quizzes WHERE id = $q_id AND course_id = $course_id");
+    $stmt_del = $pdo->prepare("DELETE FROM quizzes WHERE id = ? AND course_id = ?");
+    $stmt_del->execute([$q_id, $course_id]);
     header("Location: quiz_editor.php?id=$course_id");
     exit;
 }
@@ -41,7 +43,9 @@ $questions->execute([$course_id]);
 $quiz_list = $questions->fetchAll();
 
 // Fetch Course Info
-$course = $pdo->query("SELECT title FROM trainings WHERE id = $course_id")->fetch();
+$stmt_course = $pdo->prepare("SELECT title FROM trainings WHERE id = ?");
+$stmt_course->execute([$course_id]);
+$course = $stmt_course->fetch();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -98,6 +102,7 @@ $course = $pdo->query("SELECT title FROM trainings WHERE id = $course_id")->fetc
                     <?php endif; ?>
 
                     <form method="POST">
+                        <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                         <div class="form-group margin-bottom: 1rem;">
                             <label class="form-label">คำถาม</label>
                             <textarea name="question" class="form-input" rows="3" required></textarea>

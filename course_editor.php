@@ -26,13 +26,16 @@ if (!$course || ($course['created_by'] != $_SESSION['user_id'] && $_SESSION['rol
 
 // 1. Add Lesson
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_lesson'])) {
+    verify_csrf_token($_POST['csrf_token'] ?? '');
     $title = $_POST['lesson_title'];
     $video_url = $_POST['video_url'];
     $duration = $_POST['duration'];
     $content = $_POST['content'];
 
     // Get next order index
-    $order = $pdo->query("SELECT MAX(order_index) FROM course_lessons WHERE course_id = $id")->fetchColumn() + 1;
+    $stmt_order = $pdo->prepare("SELECT MAX(order_index) FROM course_lessons WHERE course_id = ?");
+    $stmt_order->execute([$id]);
+    $order = $stmt_order->fetchColumn() + 1;
 
     $stmt = $pdo->prepare("INSERT INTO course_lessons (course_id, title, video_url, duration, content, order_index) VALUES (?, ?, ?, ?, ?, ?)");
     $stmt->execute([$id, $title, $video_url, $duration, $content, $order]);
@@ -42,6 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_lesson'])) {
 
 // 2. Add Quiz Question
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_question'])) {
+    verify_csrf_token($_POST['csrf_token'] ?? '');
     $question = $_POST['question'];
     $options = json_encode([
         'A' => $_POST['option_a'],
@@ -59,6 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_question'])) {
 
 // 3. Update Settings
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_settings'])) {
+    verify_csrf_token($_POST['csrf_token'] ?? '');
     $title = $_POST['title'];
     $desc = $_POST['description'];
     $level = $_POST['level'];
@@ -85,13 +90,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_settings'])) {
 // Delete Actions
 if (isset($_GET['delete_lesson'])) {
     $l_id = (int) $_GET['delete_lesson'];
-    $pdo->exec("DELETE FROM course_lessons WHERE id = $l_id AND course_id = $id");
+    $stmt_del = $pdo->prepare("DELETE FROM course_lessons WHERE id = ? AND course_id = ?");
+    $stmt_del->execute([$l_id, $id]);
     header("Location: course_editor.php?id=$id&tab=lessons");
     exit;
 }
 if (isset($_GET['delete_quiz'])) {
     $q_id = (int) $_GET['delete_quiz'];
-    $pdo->exec("DELETE FROM quizzes WHERE id = $q_id AND course_id = $id");
+    $stmt_del_q = $pdo->prepare("DELETE FROM quizzes WHERE id = ? AND course_id = ?");
+    $stmt_del_q->execute([$q_id, $id]);
     header("Location: course_editor.php?id=$id&tab=quiz");
     exit;
 }
@@ -230,6 +237,7 @@ $all_quizzes = $quizzes->fetchAll();
 
                             <form method="POST"
                                 style="background: #f8fafc; padding: 1.5rem; border-radius: 0.75rem; border: 1px dashed #cbd5e1; margin-bottom: 2rem;">
+                                <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                                 <input type="hidden" name="add_lesson" value="1">
                                 <div class="form-group margin-bottom-2">
                                     <label class="form-label">หัวข้อบทเรียน</label>
@@ -281,6 +289,7 @@ $all_quizzes = $quizzes->fetchAll();
 
                             <form method="POST"
                                 style="background: #f8fafc; padding: 1.5rem; border-radius: 0.75rem; border: 1px dashed #cbd5e1; margin-bottom: 2rem;">
+                                <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                                 <input type="hidden" name="add_question" value="1">
                                 <div class="form-group margin-bottom-2">
                                     <label class="form-label">คำถาม</label>
@@ -331,6 +340,7 @@ $all_quizzes = $quizzes->fetchAll();
                         <div class="content-card">
                             <h3 style="margin-bottom: 1.5rem;">ตั้งค่าหลักสูตร</h3>
                             <form method="POST" enctype="multipart/form-data">
+                                <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                                 <input type="hidden" name="update_settings" value="1">
                                 <div class="form-group margin-bottom-2">
                                     <label class="form-label">ชื่อคอร์ส</label>

@@ -11,7 +11,9 @@ if (!$user_id) {
 }
 
 $target_user_id = isset($_GET['user']) ? (int) $_GET['user'] : 0;
-$users = $pdo->query("SELECT id, username, full_name FROM users WHERE id != $user_id")->fetchAll();
+$stmt_users = $pdo->prepare("SELECT id, username, full_name FROM users WHERE id != ?");
+$stmt_users->execute([$user_id]);
+$users = $stmt_users->fetchAll();
 
 $messages = [];
 if ($target_user_id > 0) {
@@ -36,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $target_user_id > 0) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>กล่องข้อความ | UDRU Wisdom</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo filemtime('assets/css/style.css'); ?>">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
@@ -192,7 +194,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $target_user_id > 0) {
 
                 <div class="chat-main">
                     <?php if ($target_user_id > 0):
-                        $target_user = $pdo->query("SELECT * FROM users WHERE id = $target_user_id")->fetch();
+                        $stmt_target = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+                        $stmt_target->execute([$target_user_id]);
+                        $target_user = $stmt_target->fetch();
                         ?>
                         <div class="chat-header">
                             <div style="display: flex; gap: 1rem; align-items: center;">

@@ -11,8 +11,11 @@ $error = '';
 $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = $_POST['username'] ?? '';
-    $password = $_POST['password'] ?? '';
+    $token = $_POST['csrf_token'] ?? '';
+    try {
+        verify_csrf_token($token);
+        $username = $_POST['username'] ?? '';
+        $password = $_POST['password'] ?? '';
     $full_name = $_POST['full_name'] ?? '';
     $email = $_POST['email'] ?? '';
 
@@ -28,10 +31,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $pdo->prepare("INSERT INTO users (username, password, full_name, email) VALUES (?, ?, ?, ?)");
                 $stmt->execute([$username, $hashed_password, $full_name, $email]);
                 $success = "สร้างบัญชีสำเร็จ! คุณสามารถ <a href='login.php' style='color: var(--primary); font-weight: 700; text-decoration: none;'>เข้าสู่ระบบ</a> ได้ทันที";
+                log_activity('user_registration', 'user', "New user: $username ($email)");
             }
-        } catch (PDOException $e) {
+        } catch (Exception $e) {
             $error = "เกิดข้อผิดพลาด: " . $e->getMessage();
         }
+    }
+    } catch (Exception $e) {
+        $error = "เกิดข้อผิดพลาด: " . $e->getMessage();
     }
 }
 ?>
@@ -47,6 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         body {
             background-color: var(--sidebar-bg);
@@ -138,15 +146,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <h2 style="color: white; font-weight: 800; margin-bottom: 0.5rem;">Create Account</h2>
         <p style="color: #94a3b8; margin-bottom: 2rem; font-size: 0.9rem;">ร่วมเป็นส่วนหนึ่งของเครือข่ายความรู้ UDRU</p>
 
-        <?php if ($error): ?>
-            <div class="error-msg"><?php echo $error; ?></div>
-        <?php endif; ?>
-
-        <?php if ($success): ?>
-            <div class="success-msg"><?php echo $success; ?></div>
-        <?php endif; ?>
+        <script>
+            <?php if ($error): ?>
+                Swal.fire({
+                    icon: 'error',
+                    title: 'ข้อผิดพลาด',
+                    text: '<?php echo htmlspecialchars(str_replace('\'', '\\\'', $error)); ?>',
+                    confirmButtonColor: 'var(--primary)',
+                    background: '#1e293b',
+                    color: '#f8fafc'
+                });
+            <?php endif; ?>
+            <?php if ($success): ?>
+                Swal.fire({
+                    icon: 'success',
+                    title: 'สำเร็จ!',
+                    html: '<?php echo str_replace('\'', '\\\'', $success); ?>',
+                    confirmButtonColor: 'var(--primary)',
+                    background: '#1e293b',
+                    color: '#f8fafc'
+                });
+            <?php endif; ?>
+        </script>
 
         <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
             <div class="form-group">
                 <label class="form-label">ชื่อ-นามสกุล</label>
                 <input type="text" name="full_name" class="form-control" placeholder="เช่น นายสมชาย ใจดี" required>

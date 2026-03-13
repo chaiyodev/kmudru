@@ -78,7 +78,9 @@ if ($id > 0 && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_lesson
     $l_duration = $_POST['l_duration'];
     $content = $_POST['content'];
 
-    $order = $pdo->query("SELECT IFNULL(MAX(order_index), 0) FROM course_lessons WHERE course_id = $id")->fetchColumn() + 1;
+    $stmt_order = $pdo->prepare("SELECT IFNULL(MAX(order_index), 0) FROM course_lessons WHERE course_id = ?");
+    $stmt_order->execute([$id]);
+    $order = $stmt_order->fetchColumn() + 1;
 
     $stmt = $pdo->prepare("INSERT INTO course_lessons (course_id, title, video_url, duration, content, order_index) VALUES (?, ?, ?, ?, ?, ?)");
     $stmt->execute([$id, $l_title, $video_url, $l_duration, $content, $order]);
@@ -107,13 +109,15 @@ if ($id > 0 && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_questi
 // --- DELETE ACTIONS ---
 if (isset($_GET['delete_lesson']) && $id > 0) {
     $l_id = (int) $_GET['delete_lesson'];
-    $pdo->exec("DELETE FROM course_lessons WHERE id = $l_id AND course_id = $id");
+    $stmt_del = $pdo->prepare("DELETE FROM course_lessons WHERE id = ? AND course_id = ?");
+    $stmt_del->execute([$l_id, $id]);
     header("Location: training_create.php?id=$id&tab=lessons");
     exit;
 }
 if (isset($_GET['delete_quiz']) && $id > 0) {
     $q_id = (int) $_GET['delete_quiz'];
-    $pdo->exec("DELETE FROM quizzes WHERE id = $q_id AND course_id = $id");
+    $stmt_del_q = $pdo->prepare("DELETE FROM quizzes WHERE id = ? AND course_id = ?");
+    $stmt_del_q->execute([$q_id, $id]);
     header("Location: training_create.php?id=$id&tab=quiz");
     exit;
 }
@@ -134,8 +138,13 @@ if ($id > 0) {
 $all_lessons = [];
 $all_quizzes = [];
 if ($id > 0) {
-    $all_lessons = $pdo->query("SELECT * FROM course_lessons WHERE course_id = $id ORDER BY order_index ASC")->fetchAll();
-    $all_quizzes = $pdo->query("SELECT * FROM quizzes WHERE course_id = $id")->fetchAll();
+    $stmt_lessons = $pdo->prepare("SELECT * FROM course_lessons WHERE course_id = ? ORDER BY order_index ASC");
+    $stmt_lessons->execute([$id]);
+    $all_lessons = $stmt_lessons->fetchAll();
+
+    $stmt_quizzes = $pdo->prepare("SELECT * FROM quizzes WHERE course_id = ?");
+    $stmt_quizzes->execute([$id]);
+    $all_quizzes = $stmt_quizzes->fetchAll();
 }
 
 if (isset($_GET['status']) && $_GET['status'] == 'created') {

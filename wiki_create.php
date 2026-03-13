@@ -22,7 +22,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
     try {
         $stmt = $pdo->prepare("INSERT INTO documents (title, content, category_id, user_id, type, tags) VALUES (?, ?, ?, ?, 'wiki', ?)");
         $stmt->execute([$title, $content, $category_id, $user_id, $tags]);
-        $message = "บันทึกบทความ Wiki เรียบร้อยแล้ว!";
+        log_activity('wiki_create', 'document', "Title: $title");
+        $message = "สร้างบทความ Wiki เรียบร้อยแล้ว!";
     } catch (PDOException $e) {
         $error = "เกิดข้อผิดพลาด: " . $e->getMessage();
     }
@@ -183,10 +184,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
             </header>
 
             <?php if ($message): ?>
-                <div
-                    style="background: hsl(142 76% 36% / 0.1); color: hsl(142 76% 36%); padding: 1rem; border-radius: 0.5rem; margin-bottom: 2rem; border: 1px solid hsl(142 76% 36% / 0.2);">
-                    <?php echo e($message); ?>
-                </div>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'สร้างสำเร็จ!',
+                            text: '<?php echo addslashes($message); ?>',
+                            confirmButtonColor: 'var(--teal-primary)'
+                        }).then(() => {
+                            window.location.href = 'browse.php?type=wiki';
+                        });
+                    });
+                </script>
+            <?php endif; ?>
+
+            <?php if ($error): ?>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'เกิดข้อผิดพลาด',
+                            text: '<?php echo addslashes($error); ?>',
+                            confirmButtonColor: 'var(--teal-primary)'
+                        });
+                    });
+                </script>
             <?php endif; ?>
 
             <form action="wiki_create.php" method="POST">
@@ -225,7 +247,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
                             <button type="submit" class="btn-primary"
                                 style="padding: 0.75rem 2rem;">เผยแพร่บทความ</button>
                             <button type="button" class="btn-primary"
-                                style="background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));">บันทึกร่างแรกร่าง</button>
+                                style="background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));">บันทึกร่าง</button>
                         </div>
                     </div>
 

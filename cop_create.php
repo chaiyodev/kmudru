@@ -46,6 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
         $stmt->execute([$community_id, $user_id]);
 
         $pdo->commit();
+        log_activity('cop_create', 'community', "Name: $name");
         $message = "สร้างชุมชน CoP ใหม่เรียบร้อยแล้ว!";
         header("Location: cop.php?status=success");
         exit;

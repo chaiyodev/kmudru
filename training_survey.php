@@ -21,6 +21,7 @@ if (!$cert) {
 
 // Handle Survey Submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf_token($_POST['csrf_token'] ?? '');
     $rating = (int) $_POST['rating'];
     $feedback = $_POST['feedback'];
 
@@ -40,7 +41,9 @@ if ($stmt->fetch()) {
     exit;
 }
 
-$course = $pdo->query("SELECT title FROM trainings WHERE id = $course_id")->fetch();
+$stmt_course = $pdo->prepare("SELECT title FROM trainings WHERE id = ?");
+$stmt_course->execute([$course_id]);
+$course = $stmt_course->fetch();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -104,6 +107,7 @@ $course = $pdo->query("SELECT title FROM trainings WHERE id = $course_id")->fetc
         <p style="color: #64748b; margin-bottom: 2rem;">กรุณาทำแบบประเมินความพึงพอใจก่อนรับใบประกาศนียบัตร</p>
 
         <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
             <label style="font-weight: 600;">ความพึงพอใจต่อหลักสูตรนี้</label>
             <div class="star-rating">
                 <input type="radio" id="star5" name="rating" value="5" required /><label for="star5">★</label>
