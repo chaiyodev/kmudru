@@ -74,18 +74,9 @@ if (!$user_info) {
 
 $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q&A'];
 ?>
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>โปรไฟล์ของฉัน | UDRU Wisdom</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo filemtime('assets/css/style.css'); ?>">
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
-        rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
+<?php
+$page_title = 'โปรไฟล์ของฉัน | UDRU Wisdom';
+$extra_css = <<<'HTML'
     <style>
         .profile-card {
             background: white;
@@ -119,9 +110,9 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
             margin: 2rem 0;
         }
     </style>
-</head>
-
-<body>
+HTML;
+require_once 'includes/head.php';
+?>
     <div class="app-container">
         <?php include 'includes/sidebar.php'; ?>
 
@@ -329,9 +320,9 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
             </div>
         </main>
     </div>
+<?php
+$extra_js = <<<'HTML'
     <script>
-        lucide.createIcons();
-
         function submitAvatar() {
             const input = document.getElementById('avatar-input');
             if (input.files && input.files[0]) {
@@ -351,7 +342,6 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
             }
         }
     </script>
-
-</body>
-
-</html>
+HTML;
+require_once 'includes/footer.php';
+?>

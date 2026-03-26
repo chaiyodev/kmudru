@@ -1,6 +1,6 @@
 <?php
-require_once 'includes/db.php';
-require_once 'includes/auth.php';
+require_once __DIR__ . '/includes/db.php';
+require_once __DIR__ . '/includes/auth.php';
 
 if (is_logged_in()) {
     header("Location: index.php");
@@ -22,27 +22,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header("Location: index.php");
             exit;
         } else {
-            $error = is_string($login_result) ? $login_result : 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
+            $error = is_string($login_result) ? $login_result : 'ชื่อผู้เข้าใช้หรือรหัสผ่านไม่ถูกต้อง กรุณาอัปเดตเบราว์เซอร์ให้เป็นรุ่นล่าสุดหรือลองใช้โหมดไม่ระบุตัวตน (Incognito) ครับ';
             log_activity('login_failure', 'user', "User: $username | Error: $error");
         }
     } catch (Exception $e) {
         $error = $e->getMessage();
+        // Specific hint for CSRF/Session errors common on mobile
+        if (strpos($error, 'Session/CSRF Expired') !== false) {
+            $error .= " (แนะนำ: ลองปิด 'บล็อกคุกกี้ทั้งหมด' ในการตั้งค่าเบราว์เซอร์มือถือของคุณ)";
+        }
     }
 }
 ?>
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เข้าสู่ระบบ | UDRU Wisdom</title>
-    <link rel="stylesheet" href="assets/css/style.css">
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@400;500;600;700&display=swap"
-        rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<?php
+$page_title = 'เข้าสู่ระบบ | UDRU Wisdom';
+$extra_css = '
     <style>
         body {
             background-color: #0f172a;
@@ -52,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             justify-content: center;
             min-height: 100vh;
             margin: 0;
-            font-family: 'Inter', 'Sarabun', sans-serif;
+            font-family: \'Inter\', \'Sarabun\', sans-serif;
         }
 
         .login-card {
@@ -144,20 +138,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             border: 1px solid rgba(239, 68, 68, 0.2);
             text-align: left;
         }
-    </style>
-</head>
-
-<body>
-    <script>
-        // Apply Global Theme Settings immediately
-        (function () {
-            const savedTheme = localStorage.getItem('theme-primary');
-            if (savedTheme) {
-                document.documentElement.style.setProperty('--primary', savedPrimary = savedTheme);
-                document.documentElement.style.setProperty('--teal-primary', `hsl(${savedTheme})`);
-            }
-        })();
-    </script>
+    </style>';
+require_once __DIR__ . '/includes/head.php';
+?>
 
     <div class="login-card animate-fade-in">
         <div class="logo-box"><i data-lucide="book-open" style="width: 36px; height: 36px;"></i></div>
@@ -230,7 +213,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 style="color: var(--teal-primary); text-decoration: none; font-weight: 800; border-bottom: 2px solid rgba(20, 184, 166, 0.2);">ลงทะเบียนที่นี่</a>
         </p>
     </div>
-    <script>lucide.createIcons();</script>
-</body>
-
-</html>
+<?php require_once __DIR__ . '/includes/footer.php'; ?>

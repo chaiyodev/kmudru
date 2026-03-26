@@ -77,7 +77,7 @@ if ($pdo) {
             LEFT JOIN categories c ON d.category_id = c.id
             WHERE d.status = 'published'
             ORDER BY d.created_at DESC 
-            LIMIT 8";
+            LIMIT 5";
         $recent_activity = $pdo->query($activity_query)->fetchAll();
 
         // Fetch personalized AI insight (count of new docs in user's most viewed category)
@@ -101,23 +101,11 @@ if ($pdo) {
 }
 
 $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q&A'];
+
+$page_title = 'UDRU Wisdom | UDRU Knowledge Hub';
+$extra_css = '<link rel="stylesheet" href="assets/css/index.css">';
+require_once 'includes/head.php';
 ?>
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UDRU Wisdom | UDRU Knowledge Hub</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo filemtime('assets/css/style.css'); ?>">
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
-        rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <link rel="stylesheet" href="assets/css/index.css">
-</head>
-
-<body>
     <div class="app-container">
         <!-- Standardized Sidebar -->
         <?php include 'includes/sidebar.php'; ?>
@@ -140,7 +128,9 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                     <p>สืบค้นและแบ่งปันองค์ความรู้เพื่อสังคมแห่งการเรียนรู้ UDRU</p>
                 </div>
                 <div class="header-actions">
-                    <a href="create.php" class="btn-primary"><i data-lucide="plus"></i>สร้างองค์ความรู้</a>
+                    <a href="<?php echo is_logged_in() ? 'create.php' : 'javascript:void(0)'; ?>" 
+                       onclick="<?php echo is_logged_in() ? '' : "return requireLoginPrompt('สร้างองค์ความรู้')"; ?>" 
+                       class="btn-primary"><i data-lucide="plus"></i>สร้างองค์ความรู้</a>
                 </div>
             </header>
 
@@ -249,6 +239,21 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                                     </div>
                                     <span class="type-tag"><?php echo $type_labels[$doc['type']] ?? 'เนื้อหา'; ?></span>
                                 </div>
+                                
+                                <?php 
+                                $cover_image = null;
+                                if (preg_match('/<img[^>]+src="([^">]+)"/i', $doc['content'], $matches)) {
+                                    $cover_image = $matches[1];
+                                } elseif (preg_match('/!\[.*?\]\((.*?)\)/i', $doc['content'], $matches)) {
+                                    $cover_image = $matches[1];
+                                }
+                                ?>
+                                <?php if ($cover_image): ?>
+                                    <div style="width: calc(100% + 40px); height: 180px; margin: 1rem -20px 1.5rem -20px; border-radius: 8px; overflow: hidden; position: relative;">
+                                        <div style="position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.03);"></div>
+                                        <img src="<?php echo htmlspecialchars($cover_image); ?>" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;" loading="lazy">
+                                    </div>
+                                <?php endif; ?>
 
                                 <h3 class="card-title"><?php echo e($doc['title']); ?></h3>
                                 <p class="card-desc">
@@ -295,7 +300,7 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                     </div>
                 </section>
 
-                <aside>
+                <aside style="display: flex; flex-direction: column; position: sticky; top: 2rem; align-self: start;">
                     <!-- AI Smart Hub Widget -->
                     <div class="ai-smart-card"
                         style="background: linear-gradient(135deg, #14b8a6 0%, #0ea5e9 100%); padding: 1.5rem; border-radius: 1rem; color: white; margin-bottom: 2rem; position: relative; overflow: hidden; box-shadow: 0 10px 25px rgba(20, 184, 166, 0.3);">
@@ -364,9 +369,9 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
         </main>
     </div>
 
+<?php 
+$extra_js = <<<'HTML'
     <script>
-        lucide.createIcons();
-
         let aiMode = false;
         function toggleAI() {
             aiMode = !aiMode;
@@ -393,6 +398,6 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
             lucide.createIcons();
         }
     </script>
-</body>
-
-</html>
+HTML;
+require_once 'includes/footer.php';
+?>

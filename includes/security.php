@@ -20,11 +20,30 @@ function e($string)
     return htmlspecialchars($string, ENT_QUOTES, 'UTF-8');
 }
 
-// 3. CSRF Protection
+// 3. CSRF Protection (Compatibility: random_bytes polyfill for PHP < 7.0)
+if (!function_exists('random_bytes')) {
+    function random_bytes($length)
+    {
+        if (function_exists('openssl_random_pseudo_bytes')) {
+            $bytes = openssl_random_pseudo_bytes($length, $strong);
+            if ($strong === true) return $bytes;
+        }
+        $data = '';
+        for ($i = 0; $i < $length; $i++) {
+            $data .= chr(mt_rand(0, 255));
+        }
+        return $data;
+    }
+}
+
 function generate_csrf_token()
 {
     if (empty($_SESSION['csrf_token'])) {
-        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        try {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        } catch (Exception $e) {
+            $_SESSION['csrf_token'] = md5(uniqid(mt_rand(), true));
+        }
     }
     return $_SESSION['csrf_token'];
 }
@@ -32,7 +51,7 @@ function generate_csrf_token()
 function verify_csrf_token($token)
 {
     if (empty($_SESSION['csrf_token']) || $token !== $_SESSION['csrf_token']) {
-        die("Security Validation Failed: CSRF token mismatch.");
+        throw new Exception("ความปลอดภัยผิดพลาด (Session/CSRF Expired) กรุณารีเฟรชหน้าจอหรือลองใหม่อีกครั้งเพื่อความปลอดภัยครับ");
     }
     return true;
 }

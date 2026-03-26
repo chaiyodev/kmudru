@@ -91,7 +91,9 @@ $categories = $pdo->query("SELECT * FROM categories")->fetchAll();
                     <p>หลักสูตรและการเรียนรู้สำหรับพัฒนาทักษะ</p>
                 </div>
                 <div class="header-actions">
-                    <a href="training_create.php" class="btn-primary">
+                    <a href="<?php echo is_logged_in() ? 'training_create.php' : 'javascript:void(0)'; ?>" 
+                       onclick="<?php echo is_logged_in() ? '' : "return requireLoginPrompt('สร้างหลักสูตรใหม่')"; ?>" 
+                       class="btn-primary">
                         <i data-lucide="plus"></i> สร้างหลักสูตร
                     </a>
                 </div>

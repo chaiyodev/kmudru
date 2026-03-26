@@ -33,6 +33,7 @@ if ($pdo) {
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="assets/css/cop.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 
 <body>
@@ -46,7 +47,9 @@ if ($pdo) {
                     <p>เครือข่ายความร่วมมือของบุคลากร UDRU เพื่อความเป็นเลิศทางวิชาการและการจัดการ</p>
                 </div>
                 <div class="header-actions">
-                    <a href="cop_create.php" class="btn-primary"
+                    <a href="<?php echo is_logged_in() ? 'cop_create.php' : 'javascript:void(0)'; ?>" 
+                       onclick="<?php echo is_logged_in() ? '' : "return requireLoginPrompt('สร้างชุมชนใหม่')"; ?>" 
+                       class="btn-primary"
                         style="background: #8b5cf6; box-shadow: 0 4px 14px 0 rgba(139, 92, 246, 0.39);">
                         <i data-lucide="plus-circle"></i> สร้างชุมชนใหม่
                     </a>
@@ -54,7 +57,7 @@ if ($pdo) {
             </header>
 
             <!-- Stats Bar -->
-            <div class="grid-stats" style="margin-bottom: 3rem;">
+            <div class="grid-stats" style="margin-bottom: 3rem; grid-template-columns: repeat(3, 1fr);">
                 <div class="card-stat">
                     <div class="stat-header">
                         <div class="stat-icon" style="background: #f5f3ff; color: #8b5cf6;"><i data-lucide="layers"></i>
@@ -120,16 +123,13 @@ if ($pdo) {
                                     สมาชิก
                                 </div>
                                 <div style="display: flex; -webkit-rtl-ordering: visual; direction: rtl;">
-                                    <!-- Simple Avatar Stack Mockup -->
-                                    <div
-                                        style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; background: #e2e8f0; margin-left: -8px;">
-                                    </div>
-                                    <div
-                                        style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; background: #cbd5e1; margin-left: -8px;">
-                                    </div>
-                                    <div
-                                        style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; background: #94a3b8; margin-left: -8px;">
-                                    </div>
+                                    <?php
+                                    $stmt_m = $pdo->prepare("SELECT u.avatar FROM community_members m JOIN users u ON m.user_id = u.id WHERE community_id = ? LIMIT 3");
+                                    $stmt_m->execute([$cop['id']]);
+                                    $top_members = $stmt_m->fetchAll();
+                                    foreach($top_members as $tm): ?>
+                                        <div style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; background: #e2e8f0; margin-left: -8px; background-image: url('uploads/avatars/<?php echo $tm['avatar'] ?: 'default.png'; ?>'); background-size: cover; background-position: center;"></div>
+                                    <?php endforeach; ?>
                                 </div>
                             </div>
 

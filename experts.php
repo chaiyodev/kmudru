@@ -54,6 +54,13 @@ if ($pdo) {
                     <h2>ทำความรู้จักผู้เชี่ยวชาญ UDRU</h2>
                     <p>รวบรวมบุคลากรที่มีความรู้ความสามารถโดดเด่นในแต่ละสาขา</p>
                 </div>
+                <div class="header-actions">
+                    <a href="<?php echo is_logged_in() ? 'experts_create.php' : 'javascript:void(0)'; ?>" 
+                       onclick="<?php echo is_logged_in() ? '' : "return requireLoginPrompt('ลงทะเบียนเป็นผู้เชี่ยวชาญ')"; ?>" 
+                       class="btn-primary">
+                        <i data-lucide="user-plus"></i> ลงทะเบียนผู้เชี่ยวชาญ
+                    </a>
+                </div>
             </header>
 
             <!-- Search & Filters -->

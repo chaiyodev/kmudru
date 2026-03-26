@@ -34,6 +34,7 @@ if (is_logged_in()) {
     }
 }
 ?>
+<script src="https://unpkg.com/lucide@latest"></script>
 <script>
     // Pre-paint state check to prevent layout shift
     if (localStorage.getItem('sidebarCollapsed') === 'true') {
@@ -80,7 +81,7 @@ if (is_logged_in()) {
             </a>
             <a href="cop.php"
                 class="nav-link <?php echo ($current_page == 'cop.php' || $current_page == 'cop_create.php' || $current_page == 'cop_view.php') ? 'active' : ''; ?>">
-                <i data-lucide="share-2"></i>
+                <i data-lucide="network"></i>
                 <span>เครือข่าย CoP</span>
             </a>
             <a href="categories.php"

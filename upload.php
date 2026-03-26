@@ -2,6 +2,8 @@
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 
+require_login();
+
 $pdo = get_pdo();
 $categories = [];
 if ($pdo) {
@@ -47,7 +49,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
             'image/png'
         ];
 
-        if (!in_array($file_ext, $allowed_extensions) || !in_array($mime_type, $allowed_mime_types)) {
+        $max_file_size = 50 * 1024 * 1024; // 50 MB
+
+        if ($_FILES['file']['size'] > $max_file_size) {
+            $error = "ขนาดไฟล์เกินที่กำหนดไว้ (สูงสุด 50MB)";
+        } else if (!in_array($file_ext, $allowed_extensions) || !in_array($mime_type, $allowed_mime_types)) {
             $error = "ไฟล์ที่อัปโหลดไม่ได้รับอนุญาตให้ใช้งาน (รองรับเฉพาะ PDF, Word, Excel, PPT, JPG, PNG)";
         } else if (move_uploaded_file($_FILES['file']['tmp_name'], $target_file)) {
             try {
@@ -77,22 +83,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
     }
 }
 ?>
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>อัปโหลดเอกสาร | UDRU Wisdom</title>
-    <link rel="stylesheet" href="assets/css/style.css">
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
-        rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <link rel="stylesheet" href="assets/css/upload.css">
-</head>
-
-<body>
+<?php
+$page_title = 'อัปโหลดเอกสาร | UDRU Wisdom';
+$extra_css = '<link rel="stylesheet" href="assets/css/upload.css">';
+require_once 'includes/head.php';
+?>
     <div class="app-container">
         <?php include 'includes/sidebar.php'; ?>
 
@@ -221,39 +216,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
         </main>
     </div>
 
+<?php
+$extra_js = <<<'HTML'
     <script>
-        lucide.createIcons();
-
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
 
-        dropZone.addEventListener('click', () => fileInput.click());
+        if (dropZone && fileInput) {
+            dropZone.addEventListener('click', () => fileInput.click());
 
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.classList.add('drag-active');
-        });
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('drag-active');
+            });
 
-        ['dragleave', 'drop'].forEach(event => {
-            dropZone.addEventListener(event, () => dropZone.classList.remove('drag-active'));
-        });
+            ['dragleave', 'drop'].forEach(event => {
+                dropZone.addEventListener(event, () => dropZone.classList.remove('drag-active'));
+            });
 
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            fileInput.files = e.dataTransfer.files;
-            handleFileSelect();
-        });
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                fileInput.files = e.dataTransfer.files;
+                handleFileSelect();
+            });
 
-        fileInput.addEventListener('change', handleFileSelect);
+            fileInput.addEventListener('change', handleFileSelect);
 
-        function handleFileSelect() {
-            if (fileInput.files.length > 0) {
-                const fileName = fileInput.files[0].name;
-                dropZone.querySelector('h3').textContent = 'เลือกไฟล์แล้ว: ' + fileName;
-                dropZone.querySelector('p').textContent = 'คลิกเพื่อเปลี่ยนไฟล์';
+            function handleFileSelect() {
+                if (fileInput.files.length > 0) {
+                    const fileName = fileInput.files[0].name;
+                    dropZone.querySelector('h3').textContent = 'เลือกไฟล์แล้ว: ' + fileName;
+                    dropZone.querySelector('p').textContent = 'คลิกเพื่อเปลี่ยนไฟล์';
+                }
             }
         }
     </script>
-</body>
-
-</html>
+HTML;
+require_once 'includes/footer.php';
+?>

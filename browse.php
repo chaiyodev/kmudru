@@ -77,7 +77,9 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                     <p>ค้นหาและกรององค์ความรู้ตามความสนใจของคุณ</p>
                 </div>
                 <div class="header-actions">
-                    <a href="create.php" class="btn-primary"><i data-lucide="plus"></i>สร้างเนื้อหา</a>
+                    <a href="<?php echo is_logged_in() ? 'create.php' : 'javascript:void(0)'; ?>" 
+                       onclick="<?php echo is_logged_in() ? '' : "return requireLoginPrompt('สร้างเนื้อหาใหม่')"; ?>" 
+                       class="btn-primary"><i data-lucide="plus"></i>สร้างเนื้อหา</a>
                 </div>
             </header>
 
@@ -121,6 +123,22 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                     <?php foreach ($docs as $doc): ?>
                         <div class="card-knowledge" onclick="location.href='view.php?id=<?php echo $doc['id']; ?>'"
                             style="cursor: pointer;">
+                            
+                            <?php 
+                            $cover_image = null;
+                            if (preg_match('/<img[^>]+src="([^">]+)"/i', $doc['content'], $matches)) {
+                                $cover_image = $matches[1];
+                            } elseif (preg_match('/!\[.*?\]\((.*?)\)/i', $doc['content'], $matches)) {
+                                $cover_image = $matches[1];
+                            }
+                            ?>
+                            <?php if ($cover_image): ?>
+                                <div style="width: calc(100% + 3rem); height: 160px; margin: -1.5rem -1.5rem 1.5rem -1.5rem; border-top-left-radius: inherit; border-top-right-radius: inherit; overflow: hidden; position: relative;">
+                                    <div style="position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.03);"></div>
+                                    <img src="<?php echo htmlspecialchars($cover_image); ?>" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
+                                </div>
+                            <?php endif; ?>
+
                             <div class="card-tags">
                                 <span class="tag-badge"
                                     style="background: hsl(var(--primary) / 0.1); color: var(--teal-primary);"><?php echo $type_labels[$doc['type']]; ?></span>

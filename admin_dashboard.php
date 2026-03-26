@@ -3,10 +3,7 @@ require_once 'includes/db.php';
 require_once 'includes/auth.php';
 
 // Check Admin Access
-if (!is_logged_in() || $_SESSION['role'] !== 'admin') {
-    header("Location: index.php");
-    exit;
-}
+require_admin();
 
 $pdo = get_pdo();
 
@@ -39,18 +36,9 @@ $top_pages = $pdo->query("SELECT page_visited, COUNT(*) as cnt FROM visitor_stat
 
 $recent_users = $pdo->query("SELECT * FROM users ORDER BY created_at DESC LIMIT 5")->fetchAll();
 ?>
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ผู้ดูแลระบบ | UDRU Wisdom</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo filemtime('assets/css/style.css'); ?>">
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap"
-        rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
+<?php
+$page_title = 'ผู้ดูแลระบบ | UDRU Wisdom';
+$extra_css = <<<'HTML'
     <style>
         .admin-card {
             background: white;
@@ -95,9 +83,9 @@ $recent_users = $pdo->query("SELECT * FROM users ORDER BY created_at DESC LIMIT 
             color: var(--teal-primary);
         }
     </style>
-</head>
-
-<body>
+HTML;
+require_once 'includes/head.php';
+?>
     <div class="app-container">
         <?php include 'includes/sidebar.php'; ?>
 
@@ -325,7 +313,4 @@ $recent_users = $pdo->query("SELECT * FROM users ORDER BY created_at DESC LIMIT 
 
         </main>
     </div>
-    <script>lucide.createIcons();</script>
-</body>
-
-</html>
+<?php require_once 'includes/footer.php'; ?>

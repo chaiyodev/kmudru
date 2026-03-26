@@ -363,7 +363,9 @@ if (array_sum($monthly_values) == 0) {
                         <?php echo max(0, $target - ($total_docs + $total_wiki + $total_qa)); ?> รายการเพื่อบรรลุ KPI
                     </p>
 
-                    <a href="create.php" class="btn-primary"
+                    <a href="<?php echo is_logged_in() ? 'create.php' : 'javascript:void(0)'; ?>" 
+                       onclick="<?php echo is_logged_in() ? '' : "return requireLoginPrompt('สร้างเนื้อหาใหม่เพื่อบรรลุเป้าหมาย')"; ?>" 
+                       class="btn-primary"
                         style="background: white; color: var(--teal-primary); margin-top: 2rem; width: 100%; justify-content: center;"><i
                             data-lucide="plus"></i>สร้างเนื้อหาใหม่</a>
                 </div>

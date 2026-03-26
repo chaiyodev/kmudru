@@ -93,6 +93,7 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
         rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="stylesheet" href="assets/css/view.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 
 <body>
@@ -102,60 +103,135 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
         <main class="main-viewport">
             <header class="header-top">
                 <div class="page-title">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <a href="browse.php" style="color: var(--teal-primary); text-decoration: none; font-weight: 600; font-size: 0.875rem;">คลังความรู้</a>
+                        <i data-lucide="chevron-right" style="width: 14px; color: #94a3b8;"></i>
+                        <span style="font-size: 0.875rem; color: #64748b;"><?php echo $type_labels[$doc['type']]; ?></span>
+                    </div>
                     <h2>รายละเอียดความรู้</h2>
-                    <p><?php echo $type_labels[$doc['type']]; ?> •
-                        <?php echo htmlspecialchars($doc['category_name']); ?>
-                    </p>
                 </div>
                 <div class="header-actions">
-                    <a href="browse.php" class="btn-primary"
-                        style="background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));"><i
-                            data-lucide="arrow-left"></i>กลับ</a>
-                    <a href="create.php" class="btn-primary"><i data-lucide="plus"></i>สร้างใหม่</a>
+                    <button onclick="history.back()" class="btn-primary" style="background: white; color: #1e293b; border: 1px solid var(--border-color);">
+                        <i data-lucide="arrow-left"></i> กลับ
+                    </button>
+                    <a href="<?php echo is_logged_in() ? 'create.php' : 'javascript:void(0)'; ?>" 
+                       onclick="<?php echo is_logged_in() ? '' : "return requireLoginPrompt('สร้างบทความใหม่')"; ?>" 
+                       class="btn-primary"><i data-lucide="plus"></i>สร้างใหม่</a>
                 </div>
             </header>
 
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem;">
+            <div class="view-grid">
                 <!-- Main Article -->
                 <div>
-                    <article
-                        style="background: white; border-radius: 1.5rem; border: 1px solid var(--border-color); padding: 3rem; margin-bottom: 2rem;">
-                        <span class="tag-badge"
-                            style="background: hsl(var(--primary)/0.1); color: var(--teal-primary); margin-bottom: 1.5rem; display: inline-block;"><?php echo $type_labels[$doc['type']]; ?></span>
+                    <article class="article-card">
+                        <?php 
+                        $cover_image = null;
+                        $album_images = [];
+                        try {
+                            $stmt = $pdo->prepare("SELECT file_path FROM document_images WHERE document_id = ? ORDER BY id ASC");
+                            $stmt->execute([$doc['id']]);
+                            $album_images = $stmt->fetchAll(PDO::FETCH_COLUMN);
+                        } catch (PDOException $e) {}
 
-                        <h1 style="font-size: 2rem; font-weight: 800; line-height: 1.3; margin-bottom: 1.5rem;">
+                        if (!empty($album_images)) {
+                            $cover_image = $album_images[0];
+                        } else {
+                            if (preg_match('/<img[^>]+src="([^">]+)"/i', $doc['content'], $matches)) {
+                                $cover_image = $matches[1];
+                            } elseif (preg_match('/!\[.*?\]\((.*?)\)/i', $doc['content'], $matches)) {
+                                $cover_image = $matches[1];
+                            }
+                        }
+                        ?>
+                        <?php if ($cover_image): ?>
+                            <div class="article-cover-banner">
+                                <div class="article-cover-overlay"></div>
+                                <img src="<?php echo htmlspecialchars($cover_image); ?>" loading="lazy">
+                            </div>
+                        <?php endif; ?>
+
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem;">
+                            <span class="tag-badge" style="background: hsl(var(--primary)/0.1); color: var(--teal-primary);"><?php echo $type_labels[$doc['type']]; ?></span>
+                            <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; background: #f8fafc; padding: 4px 12px; border-radius: 20px;">
+                                ID: #<?php echo str_pad($doc['id'], 5, '0', STR_PAD_LEFT); ?>
+                            </div>
+                        </div>
+
+                        <h1 class="article-title">
                             <?php echo htmlspecialchars($doc['title']); ?>
                         </h1>
 
-                        <div
-                            style="display: flex; gap: 1.5rem; color: hsl(var(--muted-foreground)); font-size: 0.875rem; padding-bottom: 2rem; margin-bottom: 2rem; border-bottom: 1px solid var(--border-color);">
-                            <span><i data-lucide="user"
-                                    style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i><?php echo htmlspecialchars($doc['author_name']); ?></span>
-                            <span><i data-lucide="calendar"
-                                    style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i><?php echo date('d M Y', strtotime($doc['created_at'])); ?></span>
-                            <span><i data-lucide="eye"
-                                    style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i><?php echo $doc['views']; ?></span>
-                            <span><i data-lucide="heart"
-                                    style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i><?php echo $total_likes; ?></span>
+                        <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; color: #64748b; font-size: 0.875rem; padding-bottom: 2rem; margin-bottom: 3rem; border-bottom: 1px solid #f1f5f9;">
+                            <div class="view-stat-item"><i data-lucide="user" style="width: 16px;"></i> <?php echo htmlspecialchars($doc['author_name']); ?></div>
+                            <div class="view-stat-item"><i data-lucide="calendar" style="width: 16px;"></i> <?php echo date('d M Y', strtotime($doc['created_at'])); ?></div>
+                            <div class="view-stat-item"><i data-lucide="folder" style="width: 16px;"></i> <?php echo htmlspecialchars($doc['category_name']); ?></div>
+                            <div class="view-stat-item"><i data-lucide="eye" style="width: 16px;"></i> <?php echo number_format($doc['views']); ?> ครั้ง</div>
                         </div>
 
-                        <div class="article-content"><?php echo nl2br(htmlspecialchars($doc['content'])); ?></div>
+                        <div class="article-content" id="article-body">
+                            <?php 
+                            if ($doc['type'] === 'wiki') {
+                                // Content will be rendered via JS marked.js
+                                echo '<div id="markdown-content" style="display:none;">' . htmlspecialchars($doc['content']) . '</div>';
+                                echo '<div id="rendered-content"></div>';
+                            } else {
+                                echo htmlspecialchars($doc['content']); 
+                            }
+                            ?>
+                        </div>
+
+                        <?php if ($doc['type'] === 'wiki'): ?>
+                        <script>
+                            document.addEventListener('DOMContentLoaded', function() {
+                                const raw = document.getElementById('markdown-content').textContent;
+                                document.getElementById('rendered-content').innerHTML = marked.parse(raw);
+                                lucide.createIcons();
+                            });
+                        </script>
+                        <?php endif; ?>
+
+                        <?php if(!empty($album_images)): ?>
+                        <div style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border-color);">
+                            <h3 style="font-size: 1.125rem; font-weight: 800; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                                <div style="width: 32px; height: 32px; background: rgba(20, 184, 166, 0.1); color: var(--teal-primary); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                                    <i data-lucide="image" style="width: 16px;"></i>
+                                </div>
+                                อัลบั้มภาพ
+                            </h3>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem;">
+                                <?php foreach($album_images as $img): ?>
+                                    <div onclick="openImageModal('<?php echo htmlspecialchars($img); ?>')" style="display: block; aspect-ratio: 4/3; border-radius: 0.75rem; overflow: hidden; border: 1px solid var(--border-color); cursor: zoom-in; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                                        <img src="<?php echo htmlspecialchars($img); ?>" style="width: 100%; height: 100%; object-fit: cover;">
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                        <?php endif; ?>
 
                         <div
                             style="display: flex; gap: 0.75rem; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border-color);">
-                            <form method="POST" style="display:inline;">
-                                <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
-                                <input type="hidden" name="action" value="like">
-                                <button type="submit" class="btn-primary"
-                                    style="<?php echo $user_liked ? 'background: hsl(339 90% 50%); color: white;' : 'background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));'; ?>">
-                                    <i data-lucide="heart"></i><?php echo $user_liked ? 'คุณชอบแล้ว' : 'ถูกใจ'; ?>
-                                    (<?php echo $total_likes; ?>)
+                            <?php if (is_logged_in()): ?>
+                                <form method="POST" style="display:inline;">
+                                    <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
+                                    <input type="hidden" name="action" value="like">
+                                    <button type="submit" class="btn-primary"
+                                        style="<?php echo $user_liked ? 'background: hsl(339 90% 50%); color: white;' : 'background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));'; ?>">
+                                        <i data-lucide="heart"></i><?php echo $user_liked ? 'คุณชอบแล้ว' : 'ถูกใจ'; ?>
+                                        (<?php echo $total_likes; ?>)
+                                    </button>
+                                </form>
+                            <?php else: ?>
+                                <button type="button" class="btn-primary" onclick="requireLoginPrompt('ถูกใจบทความ')"
+                                    style="background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));">
+                                    <i data-lucide="heart"></i>ถูกใจ (<?php echo $total_likes; ?>)
                                 </button>
-                            </form>
+                            <?php endif; ?>
+                            
                             <button class="btn-primary"
                                 style="background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));"
-                                onclick="document.getElementById('comment-box').focus()"><i
-                                    data-lucide="message-square"></i>แสดงความเห็น</button>
+                                onclick="<?php echo is_logged_in() ? "document.getElementById('comment-box').focus()" : "requireLoginPrompt('แสดงความคิดเห็น')"; ?>">
+                                <i data-lucide="message-square"></i>แสดงความเห็น
+                            </button>
                             <button class="btn-primary"
                                 style="background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));"><i
                                     data-lucide="share-2"></i>แชร์</button>
@@ -193,6 +269,8 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                                 <div style="text-align: right; margin-top: 1rem;"><button type="submit"
                                         class="btn-primary">ส่งความคิดเห็น</button></div>
                             </form>
+                        <?php else: ?>
+                            <!-- Guest view: No comment box, alert triggered by action buttons -->
                         <?php endif; ?>
 
                         <div style="display: flex; flex-direction: column; gap: 1rem;">
@@ -264,7 +342,27 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
             </div>
         </main>
     </div>
-    <script>lucide.createIcons();</script>
+    <div id="image-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.9); z-index: 9999; align-items: center; justify-content: center; backdrop-filter: blur(8px); opacity: 0; transition: opacity 0.3s ease;">
+        <button onclick="closeImageModal()" style="position: absolute; top: 20px; right: 20px; background: none; border: none; color: white; cursor: pointer; padding: 10px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+            <i data-lucide="x" style="width: 32px; height: 32px;"></i>
+        </button>
+        <img id="modal-image" src="" style="max-width: 90vw; max-height: 90vh; object-fit: contain; border-radius: 8px; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+    </div>
+    <script>
+        lucide.createIcons();
+        function openImageModal(src) {
+            document.getElementById('modal-image').src = src;
+            const modal = document.getElementById('image-modal');
+            modal.style.display = 'flex';
+            setTimeout(() => modal.style.opacity = '1', 10);
+            document.body.style.overflow = 'hidden';
+        }
+        function closeImageModal() {
+            const modal = document.getElementById('image-modal');
+            modal.style.opacity = '0';
+            setTimeout(() => { modal.style.display = 'none'; document.body.style.overflow = ''; }, 300);
+        }
+    </script>
 </body>
 
 </html>

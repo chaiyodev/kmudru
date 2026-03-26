@@ -3,10 +3,7 @@ require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/logger.php';
 
-if (!is_logged_in() || $_SESSION['role'] !== 'admin') {
-    header("Location: index.php");
-    exit;
-}
+require_admin();
 
 $pdo = get_pdo();
 

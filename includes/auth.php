@@ -1,5 +1,24 @@
 <?php
-session_start();
+// Secure session cookie settings for mobile compatibility (Safari/ITP)
+if (session_status() === PHP_SESSION_NONE) {
+    $current_protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+
+    if (PHP_VERSION_ID >= 70300) {
+        session_set_cookie_params([
+            'lifetime' => 0,
+            'path' => '/',
+            'domain' => '',
+            'secure' => $current_protocol,
+            'httponly' => true,
+            'samesite' => 'Lax'
+        ]);
+    } else {
+        // Fallback for PHP older than 7.3.0 (No SameSite support via this function)
+        // We use the standard signature to ensure maximum stability and avoid 500 errors.
+        session_set_cookie_params(0, '/', '', $current_protocol, true);
+    }
+    session_start();
+}
 require_once __DIR__ . '/security.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/logger.php';
@@ -51,6 +70,32 @@ function require_login()
     }
 }
 
+/**
+ * Require the logged-in user to have a specific role.
+ * Redirects to index.php with an HTTP 403 status if the role does not match.
+ * Automatically calls require_login() first.
+ *
+ * @param string|array $role  A single role string or an array of allowed roles.
+ */
+function require_role($role)
+{
+    require_login();
+    $allowed = is_array($role) ? $role : [$role];
+    if (!in_array($_SESSION['role'] ?? '', $allowed, true)) {
+        http_response_code(403);
+        header("Location: index.php");
+        exit;
+    }
+}
+
+/**
+ * Shortcut: require the current user to be an admin.
+ */
+function require_admin()
+{
+    require_role('admin');
+}
+
 function logout()
 {
     session_unset();
@@ -70,4 +115,34 @@ function get_current_user_data()
         'role' => $_SESSION['role']
     ];
 }
+
+function update_user_activity()
+{
+    if (is_logged_in()) {
+        $pdo = get_pdo();
+        if ($pdo) {
+            try {
+                $stmt = $pdo->prepare("UPDATE users SET last_activity = NOW() WHERE id = ?");
+                $stmt->execute([$_SESSION['user_id']]);
+            } catch (PDOException $e) {
+                // Silently fail if column is missing; avoids 500 error
+            }
+        }
+    }
+}
+
+function get_online_members($community_id)
+{
+    $pdo = get_pdo();
+    if (!$pdo) return [];
+    try {
+        $stmt = $pdo->prepare("SELECT u.id, u.username, u.full_name, m.role FROM community_members m JOIN users u ON m.user_id = u.id WHERE m.community_id = ? AND u.last_activity > DATE_SUB(NOW(), INTERVAL 5 MINUTE) ORDER BY u.last_activity DESC LIMIT 10");
+        $stmt->execute([$community_id]);
+        return $stmt->fetchAll();
+    } catch (PDOException $e) {
+        return [];
+    }
+}
+
+if (is_logged_in()) { update_user_activity(); }
 ?>

@@ -36,7 +36,9 @@ if ($pdo) {
                     <p>สำรวจองค์ความรู้แยกตามรายวิชาและสายงาน</p>
                 </div>
                 <div class="header-actions">
-                    <a href="category_create.php" class="btn-primary"><i data-lucide="plus"></i>สร้างหมวดหมู่ใหม่</a>
+                    <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
+                        <a href="category_create.php" class="btn-primary"><i data-lucide="settings"></i>จัดการหมวดหมู่</a>
+                    <?php endif; ?>
                 </div>
             </header>
 

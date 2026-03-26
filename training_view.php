@@ -270,20 +270,27 @@ $progress_percent = $total_lessons > 0 ? round(($completed_count / $total_lesson
                         </p>
                     </div>
 
-                    <?php if ($active_lesson && !in_array($active_lesson['id'], $completed_lessons)): ?>
-                        <form method="POST">
-                            <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
-                            <input type="hidden" name="complete_lesson" value="<?php echo e($active_lesson['id']); ?>">
-                            <button type="submit" class="btn-primary"
-                                style="background: var(--teal-primary); border: none; padding: 0.75rem 1.5rem;">
-                                <i data-lucide="check-circle-2"></i> เรียนจบแล้ว (Mark Complete)
-                            </button>
-                        </form>
-                    <?php elseif ($active_lesson): ?>
-                        <div class="btn-primary"
-                            style="background: hsl(142 76% 36% / 0.1); color: hsl(142 76% 36%); border: 1px solid hsl(142 76% 36% / 0.2); cursor: default;">
-                            <i data-lucide="check"></i> เรียนจบแล้ว
-                        </div>
+                    <?php if (is_logged_in()): ?>
+                        <?php if ($active_lesson && !in_array($active_lesson['id'], $completed_lessons)): ?>
+                            <form method="POST">
+                                <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
+                                <input type="hidden" name="complete_lesson" value="<?php echo e($active_lesson['id']); ?>">
+                                <button type="submit" class="btn-primary"
+                                    style="background: var(--teal-primary); border: none; padding: 0.75rem 1.5rem;">
+                                    <i data-lucide="check-circle-2"></i> เรียนจบแล้ว (Mark Complete)
+                                </button>
+                            </form>
+                        <?php elseif ($active_lesson): ?>
+                            <div class="btn-primary"
+                                style="background: hsl(142 76% 36% / 0.1); color: hsl(142 76% 36%); border: 1px solid hsl(142 76% 36% / 0.2); cursor: default;">
+                                <i data-lucide="check"></i> เรียนจบแล้ว
+                            </div>
+                        <?php endif; ?>
+                    <?php else: ?>
+                        <button type="button" class="btn-primary" onclick="requireLoginPrompt('บันทึกความก้าวหน้าการเรียน')"
+                            style="background: var(--teal-primary); border: none; padding: 0.75rem 1.5rem;">
+                            <i data-lucide="check-circle-2"></i> เรียนจบแล้ว (Mark Complete)
+                        </button>
                     <?php endif; ?>
                 </div>
 

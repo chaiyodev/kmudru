@@ -20,8 +20,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
     $user_id = $_SESSION['user_id'];
 
     try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS document_images (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            document_id INT NOT NULL,
+            file_path VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+
         $stmt = $pdo->prepare("INSERT INTO documents (title, content, category_id, user_id, type, tags) VALUES (?, ?, ?, ?, 'wiki', ?)");
         $stmt->execute([$title, $content, $category_id, $user_id, $tags]);
+        $doc_id = $pdo->lastInsertId();
+
+        if (isset($_FILES['images'])) {
+            $upload_dir = 'uploads/';
+            if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
+            
+            $total_files = count($_FILES['images']['name']);
+            for($i = 0; $i < min($total_files, 3); $i++) {
+                if($_FILES['images']['error'][$i] === 0) {
+                    $ext = strtolower(pathinfo($_FILES['images']['name'][$i], PATHINFO_EXTENSION));
+                    if (in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'])) {
+                        $file_name = time() . '_' . $i . '_' . basename($_FILES['images']['name'][$i]);
+                        $target_file = $upload_dir . $file_name;
+                        if(move_uploaded_file($_FILES['images']['tmp_name'][$i], $target_file)) {
+                            $img_stmt = $pdo->prepare("INSERT INTO document_images (document_id, file_path) VALUES (?, ?)");
+                            $img_stmt->execute([$doc_id, $target_file]);
+                        }
+                    }
+                }
+            }
+        }
+
         log_activity('wiki_create', 'document', "Title: $title");
         $message = "สร้างบทความ Wiki เรียบร้อยแล้ว!";
     } catch (PDOException $e) {
@@ -211,14 +240,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
                 </script>
             <?php endif; ?>
 
-            <form action="wiki_create.php" method="POST">
+            <form action="wiki_create.php" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                 <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2.5rem;">
                     <div>
                         <div
                             style="background: white; border-radius: 0.75rem; border: 1px solid var(--border-color); padding: 1.5rem; margin-bottom: 1.5rem;">
                             <input type="text" name="title" placeholder="พิมพ์หัวข้อบทความ..."
-                                style="font-size: 2rem; font-weight: 800; border: none; outline: none; width: 100%; border-bottom: 2px solid transparent; transition: 0.2s;"
+                                style="font-family: inherit; font-size: clamp(1.25rem, 3vw, 1.75rem); font-weight: 800; border: none; outline: none; width: 100%; border-bottom: 2px solid transparent; transition: 0.2s;"
                                 onfocus="this.style.borderBottomColor='var(--teal-primary)'" required>
                         </div>
 
@@ -228,13 +257,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
                                 <div class="editor-tab" id="tab-preview">ดูตัวอย่าง</div>
                             </div>
                             <div class="editor-toolbar">
-                                <div class="tool-btn" title="Bold"><i data-lucide="bold"></i></div>
-                                <div class="tool-btn" title="Italic"><i data-lucide="italic"></i></div>
-                                <div class="tool-btn" title="Heading 1"><i data-lucide="heading-1"></i></div>
-                                <div class="tool-btn" title="Heading 2"><i data-lucide="heading-2"></i></div>
-                                <div class="tool-btn" title="List"><i data-lucide="list"></i></div>
-                                <div class="tool-btn" title="Link"><i data-lucide="link"></i></div>
-                                <div class="tool-btn" title="Code"><i data-lucide="code"></i></div>
+                                <div class="tool-btn" onclick="insertMD('**', '**')" title="Bold"><i data-lucide="bold"></i></div>
+                                <div class="tool-btn" onclick="insertMD('*', '*')" title="Italic"><i data-lucide="italic"></i></div>
+                                <div class="tool-btn" onclick="insertMD('# ', '')" title="Heading 1"><i data-lucide="heading-1"></i></div>
+                                <div class="tool-btn" onclick="insertMD('## ', '')" title="Heading 2"><i data-lucide="heading-2"></i></div>
+                                <div class="tool-btn" onclick="insertMD('- ', '')" title="List"><i data-lucide="list"></i></div>
+                                <div class="tool-btn" onclick="insertMD('[', '](url)')" title="Link"><i data-lucide="link"></i></div>
+                                <div class="tool-btn" onclick="insertMD('`', '`')" title="Code"><i data-lucide="code"></i></div>
                             </div>
                             <div class="editor-content">
                                 <textarea name="content" id="editor-input" class="editor-textarea"
@@ -277,35 +306,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
                         </div>
 
                         <div class="sidebar-card">
-                            <h3
-                                style="font-size: 0.875rem; font-weight: 700; margin-bottom: 1.25rem; color: hsl(var(--muted-foreground)); letter-spacing: 0.05em; text-transform: uppercase;">
-                                คู่มือ Markdown</h3>
-                            <div style="font-size: 0.8125rem; color: hsl(var(--muted-foreground)); line-height: 1.8;">
-                                <div
-                                    style="display: flex; justify-content: space-between; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px dashed var(--border-color);">
-                                    <span>**ข้อความหนา**</span>
-                                    <span style="font-weight: 700;">หนา</span>
-                                </div>
-                                <div
-                                    style="display: flex; justify-content: space-between; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px dashed var(--border-color);">
-                                    <span>*ข้อความเอียง*</span>
-                                    <span style="font-style: italic;">เอียง</span>
-                                </div>
-                                <div
-                                    style="display: flex; justify-content: space-between; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px dashed var(--border-color);">
-                                    <span># หัวข้อ</span>
-                                    <span>H1</span>
-                                </div>
-                                <div
-                                    style="display: flex; justify-content: space-between; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px dashed var(--border-color);">
-                                    <span>[ชื่อลิงก์](url)</span>
-                                    <span>ลิงก์</span>
-                                </div>
-                                <div style="display: flex; justify-content: space-between;">
-                                    <span>- รายการ</span>
-                                    <span>Bullet</span>
-                                </div>
+                            <h3 style="font-size: 0.875rem; font-weight: 700; margin-bottom: 1.25rem; color: hsl(var(--muted-foreground)); letter-spacing: 0.05em; text-transform: uppercase;">
+                                <i data-lucide="image" style="width: 16px; margin-right: 4px; vertical-align: middle;"></i> อัลบั้มรูปภาพ
+                            </h3>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <input type="file" name="images[]" multiple accept="image/jpeg, image/png, image/webp" class="form-input" id="image-upload" onchange="previewImages()" style="padding: 0.5rem; font-size: 0.8125rem;">
+                                <small style="color: hsl(var(--muted-foreground)); display: block; margin-top: 0.5rem; line-height: 1.5;">อัปโหลดภาพได้สูงสุด 3 รูป (JPG, PNG) ระบบจะใช้อัตโนมัติเป็นหน้าปกและการนำเสนออัลบั้มที่สวยงาม</small>
                             </div>
+                            <div id="image-preview-container" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-top: 1rem;"></div>
                         </div>
                     </aside>
                 </div>
@@ -337,6 +345,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
             // Render Markdown
             previewDiv.innerHTML = marked.parse(editorTextarea.value || '*ไม่มีเนื้อหาให้แสดงตัวอย่าง*');
         });
+
+        function previewImages() {
+            const container = document.getElementById('image-preview-container');
+            container.innerHTML = '';
+            const files = document.getElementById('image-upload').files;
+            const maxFiles = Math.min(files.length, 3);
+            for(let i=0; i<maxFiles; i++) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const div = document.createElement('div');
+                    div.style.aspectRatio = '1/1';
+                    div.style.borderRadius = '8px';
+                    div.style.overflow = 'hidden';
+                    div.style.background = '#f1f5f9';
+                    div.innerHTML = `<img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover;">`;
+                    container.appendChild(div);
+                }
+                reader.readAsDataURL(files[i]);
+            }
+        }
+
+        function insertMD(prefix, suffix) {
+            const textarea = document.getElementById('editor-input');
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const text = textarea.value;
+            const selectedText = text.substring(start, end);
+            
+            const defaultText = selectedText || "ข้อความ";
+            const replacement = prefix + defaultText + suffix;
+            
+            textarea.value = text.substring(0, start) + replacement + text.substring(end);
+            
+            textarea.focus();
+            if (selectedText.length === 0) {
+                textarea.selectionStart = start + prefix.length;
+                textarea.selectionEnd = start + prefix.length + defaultText.length;
+            } else {
+                textarea.selectionStart = start;
+                textarea.selectionEnd = start + replacement.length;
+            }
+        }
     </script>
 </body>
 
