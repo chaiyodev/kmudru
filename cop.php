@@ -57,7 +57,8 @@ if ($pdo) {
             </header>
 
             <!-- Stats Bar -->
-            <div class="grid-stats" style="margin-bottom: 3rem; grid-template-columns: repeat(3, 1fr);">
+            <div class="grid-stats" style="margin-bottom: 3rem;">
+
                 <div class="card-stat">
                     <div class="stat-header">
                         <div class="stat-icon" style="background: #f5f3ff; color: #8b5cf6;"><i data-lucide="layers"></i>

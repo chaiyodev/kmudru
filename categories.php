@@ -45,7 +45,7 @@ if ($pdo) {
             <div class="knowledge-grid">
                 <?php foreach ($categories as $cat): ?>
                     <div class="card-knowledge"
-                        onclick="location.href='browse.php?search=<?php echo urlencode($cat['name']); ?>'"
+                        onclick="location.href='browse.php?cat_id=<?php echo $cat['id']; ?>'"
                         style="cursor:pointer;">
                         <div
                             style="width: 48px; height: 48px; border-radius: 12px; background: hsl(var(--primary) / 0.1); color: var(--teal-primary); display: flex; align-items: center; justify-content: center; margin-bottom: 1.25rem;">

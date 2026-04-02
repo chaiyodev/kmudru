@@ -286,8 +286,8 @@ require_once 'includes/head.php';
                             <tr style="border-bottom: 1px solid var(--border-color);">
                                 <td style="padding: 0.75rem;">
                                     <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                        <div class="avatar-sm" style="width: 24px; height: 24px; font-size: 10px;">
-                                            <?php echo strtoupper(substr($user['username'], 0, 1)); ?>
+                                        <div class="avatar-sm" style="width: 24px; height: 24px; font-size: 10px; <?php if(!empty($user['avatar']) && file_exists('uploads/avatars/'.$user['avatar'])) echo "background-image: url('uploads/avatars/".htmlspecialchars($user['avatar'])."'); background-size: cover; background-position: center; color: transparent;"; ?>">
+                                            <?php if(empty($user['avatar']) || !file_exists('uploads/avatars/'.$user['avatar'])) echo mb_strtoupper(mb_substr($user['username'], 0, 1, 'UTF-8'), 'UTF-8'); ?>
                                         </div>
                                         <?php echo htmlspecialchars($user['username']); ?>
                                     </div>

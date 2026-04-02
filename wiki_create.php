@@ -74,10 +74,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
     <style>
         .editor-container {
             background: white;
-            border-radius: 0.75rem;
+            border-radius: 1rem;
             border: 1px solid var(--border-color);
             overflow: hidden;
             margin-bottom: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.03);
         }
 
         .editor-tabs {
@@ -109,21 +110,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
 
         .editor-textarea {
             width: 100%;
-            height: 400px;
+            min-height: 450px;
             padding: 1.5rem;
             border: none;
             outline: none;
-            font-family: 'JetBrains Mono', 'Courier New', monospace;
-            font-size: 0.9375rem;
-            line-height: 1.6;
-            resize: none;
+            font-family: 'Sarabun', 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            line-height: 1.8;
+            resize: vertical;
             display: block;
+            tab-size: 4;
         }
 
         .editor-preview {
-            padding: 2rem;
+            padding: 2.5rem;
             display: none;
-            min-height: 400px;
+            min-height: 450px;
             overflow-y: auto;
             background: white;
         }
@@ -131,22 +133,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
         .editor-toolbar {
             padding: 0.5rem 1rem;
             display: flex;
-            gap: 0.5rem;
+            gap: 0.25rem;
             background: white;
             border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap;
+            align-items: center;
         }
 
         .tool-btn {
-            pading: 6px;
-            border-radius: 4px;
+            padding: 6px 8px;
+            border-radius: 6px;
             cursor: pointer;
             color: hsl(var(--muted-foreground));
-            transition: var(--transition-base);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .tool-btn:hover {
-            background: hsl(var(--muted));
+            background: hsl(var(--primary) / 0.1);
             color: var(--teal-primary);
+        }
+
+        .toolbar-divider {
+            width: 1px;
+            height: 20px;
+            background: var(--border-color);
+            margin: 0 0.25rem;
+        }
+
+        .editor-status-bar {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            background: hsl(var(--muted) / 0.3);
+            border-top: 1px solid var(--border-color);
+            font-size: 0.75rem;
+            color: hsl(var(--muted-foreground));
         }
 
         .sidebar-card {
@@ -158,44 +182,156 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
         }
 
         .wiki-preview-content {
-            font-family: inherit;
+            font-family: 'Sarabun', sans-serif;
+            line-height: 1.8;
+            color: #334155;
         }
 
         .wiki-preview-content h1 {
             font-size: 2rem;
+            font-weight: 800;
             margin-bottom: 1rem;
+            color: #0f172a;
         }
 
         .wiki-preview-content h2 {
             font-size: 1.5rem;
-            margin-top: 1.5rem;
+            font-weight: 700;
+            margin-top: 2rem;
             margin-bottom: 0.75rem;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 0.5rem;
+            border-left: 4px solid var(--teal-primary);
+            padding-left: 0.875rem;
+            color: #0f172a;
+        }
+
+        .wiki-preview-content h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-top: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: #1e293b;
         }
 
         .wiki-preview-content p {
-            line-height: 1.7;
+            line-height: 1.8;
             margin-bottom: 1rem;
-            color: #333;
+            color: #334155;
+        }
+
+        .wiki-preview-content ul, .wiki-preview-content ol {
+            margin-bottom: 1rem;
+            padding-left: 1.5rem;
+        }
+
+        .wiki-preview-content li {
+            margin-bottom: 0.4rem;
+        }
+
+        .wiki-preview-content strong {
+            color: #0f172a;
+            font-weight: 700;
+        }
+
+        .wiki-preview-content blockquote {
+            border-left: 4px solid var(--teal-primary);
+            padding: 1rem 1.5rem;
+            background: hsl(var(--primary) / 0.05);
+            border-radius: 0 12px 12px 0;
+            margin: 1.5rem 0;
+            color: #475569;
         }
 
         .wiki-preview-content code {
-            background: #f0f0f0;
-            padding: 2px 4px;
+            background: #f1f5f9;
+            padding: 2px 6px;
             border-radius: 4px;
             font-size: 0.9em;
+            color: #e11d48;
         }
 
         .wiki-preview-content pre {
             background: #1e293b;
             color: #f8fafc;
-            padding: 1rem;
-            border-radius: 8px;
+            padding: 1.25rem;
+            border-radius: 10px;
             overflow-x: auto;
-            margin-bottom: 1rem;
+            margin: 1.5rem 0;
+            line-height: 1.5;
+        }
+
+        .wiki-preview-content pre code {
+            background: none;
+            color: inherit;
+            padding: 0;
+        }
+
+        .wiki-preview-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .wiki-preview-content th, .wiki-preview-content td {
+            border: 1px solid var(--border-color);
+            padding: 0.75rem 1rem;
+            text-align: left;
+        }
+
+        .wiki-preview-content th {
+            background: hsl(var(--primary) / 0.1);
+            font-weight: 700;
+        }
+
+        .wiki-preview-content hr {
+            border: none;
+            border-top: 2px solid var(--border-color);
+            margin: 2rem 0;
+        }
+
+        .wiki-preview-content img {
+            max-width: 100%;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+        .wiki-create-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 2.5rem;
+        }
+
+        .form-actions-wiki {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        @media (max-width: 1024px) {
+            .wiki-create-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .form-actions-wiki {
+                flex-direction: column;
+            }
+            .editor-tabs {
+                overflow-x: auto;
+                white-space: nowrap;
+            }
+            .editor-tab {
+                padding: 0.75rem 1rem;
+                flex: none;
+            }
+            .editor-textarea, .editor-preview {
+                padding: 1.25rem;
+                min-height: 350px;
+            }
         }
     </style>
+
 </head>
 
 <body>
@@ -242,7 +378,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
 
             <form action="wiki_create.php" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
-                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2.5rem;">
+                <div class="wiki-create-grid">
                     <div>
                         <div
                             style="background: white; border-radius: 0.75rem; border: 1px solid var(--border-color); padding: 1.5rem; margin-bottom: 1.5rem;">
@@ -257,22 +393,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
                                 <div class="editor-tab" id="tab-preview">ดูตัวอย่าง</div>
                             </div>
                             <div class="editor-toolbar">
-                                <div class="tool-btn" onclick="insertMD('**', '**')" title="Bold"><i data-lucide="bold"></i></div>
-                                <div class="tool-btn" onclick="insertMD('*', '*')" title="Italic"><i data-lucide="italic"></i></div>
-                                <div class="tool-btn" onclick="insertMD('# ', '')" title="Heading 1"><i data-lucide="heading-1"></i></div>
-                                <div class="tool-btn" onclick="insertMD('## ', '')" title="Heading 2"><i data-lucide="heading-2"></i></div>
-                                <div class="tool-btn" onclick="insertMD('- ', '')" title="List"><i data-lucide="list"></i></div>
-                                <div class="tool-btn" onclick="insertMD('[', '](url)')" title="Link"><i data-lucide="link"></i></div>
-                                <div class="tool-btn" onclick="insertMD('`', '`')" title="Code"><i data-lucide="code"></i></div>
+                                <div class="tool-btn" onclick="insertMD('**', '**')" title="ตัวหนา (Ctrl+B)"><i data-lucide="bold"></i></div>
+                                <div class="tool-btn" onclick="insertMD('*', '*')" title="ตัวเอียง (Ctrl+I)"><i data-lucide="italic"></i></div>
+                                <div class="toolbar-divider"></div>
+                                <div class="tool-btn" onclick="insertMD('# ', '')" title="หัวข้อ 1"><i data-lucide="heading-1"></i></div>
+                                <div class="tool-btn" onclick="insertMD('## ', '')" title="หัวข้อ 2"><i data-lucide="heading-2"></i></div>
+                                <div class="tool-btn" onclick="insertMD('### ', '')" title="หัวข้อ 3"><i data-lucide="heading-3"></i></div>
+                                <div class="toolbar-divider"></div>
+                                <div class="tool-btn" onclick="insertMD('- ', '')" title="รายการ"><i data-lucide="list"></i></div>
+                                <div class="tool-btn" onclick="insertMD('1. ', '')" title="รายการเรียงลำดับ"><i data-lucide="list-ordered"></i></div>
+                                <div class="tool-btn" onclick="insertMD('> ', '')" title="อ้างอิง"><i data-lucide="quote"></i></div>
+                                <div class="toolbar-divider"></div>
+                                <div class="tool-btn" onclick="insertMD('[', '](url)')" title="ลิงก์"><i data-lucide="link"></i></div>
+                                <div class="tool-btn" onclick="insertMD('![alt](', ')')" title="รูปภาพ"><i data-lucide="image"></i></div>
+                                <div class="tool-btn" onclick="insertMD('`', '`')" title="โค้ดอินไลน์"><i data-lucide="code"></i></div>
+                                <div class="tool-btn" onclick="insertTable()" title="ตาราง"><i data-lucide="table-2"></i></div>
+                                <div class="tool-btn" onclick="insertMD('\n---\n', '')" title="เส้นคั่น"><i data-lucide="minus"></i></div>
                             </div>
                             <div class="editor-content">
                                 <textarea name="content" id="editor-input" class="editor-textarea"
-                                    placeholder="เริ่มเขียนบทความของคุณที่นี่... (รองรับ Markdown)"></textarea>
+                                    placeholder="เริ่มเขียนบทความของคุณที่นี่... (รองรับ Markdown)
+
+ตัวอย่าง:
+# หัวข้อหลัก
+## หัวข้อรอง
+
+- รายการที่ 1
+- รายการที่ 2
+
+**ตัวหนา** และ *ตัวเอียง*" oninput="updateWordCount()"></textarea>
                                 <div id="editor-preview" class="editor-preview wiki-preview-content"></div>
+                            </div>
+                            <div class="editor-status-bar">
+                                <span id="word-count">0 ตัวอักษร · 0 คำ</span>
+                                <span>รองรับ Markdown</span>
                             </div>
                         </div>
 
-                        <div style="display: flex; gap: 1rem;">
+                        <div class="form-actions-wiki">
                             <button type="submit" class="btn-primary"
                                 style="padding: 0.75rem 2rem;">เผยแพร่บทความ</button>
                             <button type="button" class="btn-primary"
@@ -324,6 +482,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
     <script>
         lucide.createIcons();
 
+        // Configure marked for proper rendering
+        marked.setOptions({
+            breaks: true,
+            gfm: true
+        });
+
         const btnWrite = document.getElementById('tab-write');
         const btnPreview = document.getElementById('tab-preview');
         const editorTextarea = document.getElementById('editor-input');
@@ -334,6 +498,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
             btnPreview.classList.remove('active');
             editorTextarea.style.display = 'block';
             previewDiv.style.display = 'none';
+            document.querySelector('.editor-toolbar').style.display = 'flex';
+            document.querySelector('.editor-status-bar').style.display = 'flex';
         });
 
         btnPreview.addEventListener('click', () => {
@@ -341,11 +507,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
             btnWrite.classList.remove('active');
             editorTextarea.style.display = 'none';
             previewDiv.style.display = 'block';
+            document.querySelector('.editor-toolbar').style.display = 'none';
+            document.querySelector('.editor-status-bar').style.display = 'none';
 
-            // Render Markdown
-            previewDiv.innerHTML = marked.parse(editorTextarea.value || '*ไม่มีเนื้อหาให้แสดงตัวอย่าง*');
+            // Render Markdown with proper options
+            const content = editorTextarea.value || '*ไม่มีเนื้อหาให้แสดงตัวอย่าง*';
+            previewDiv.innerHTML = marked.parse(content);
         });
 
+        // Word/character counter
+        function updateWordCount() {
+            const text = editorTextarea.value;
+            const chars = text.length;
+            const words = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+            document.getElementById('word-count').textContent = `${chars} ตัวอักษร · ${words} คำ`;
+        }
+
+        // Image preview
         function previewImages() {
             const container = document.getElementById('image-preview-container');
             container.innerHTML = '';
@@ -366,6 +544,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
             }
         }
 
+        // Insert markdown syntax
         function insertMD(prefix, suffix) {
             const textarea = document.getElementById('editor-input');
             const start = textarea.selectionStart;
@@ -373,7 +552,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
             const text = textarea.value;
             const selectedText = text.substring(start, end);
             
-            const defaultText = selectedText || "ข้อความ";
+            const defaultText = selectedText || 'ข้อความ';
             const replacement = prefix + defaultText + suffix;
             
             textarea.value = text.substring(0, start) + replacement + text.substring(end);
@@ -386,7 +565,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
                 textarea.selectionStart = start;
                 textarea.selectionEnd = start + replacement.length;
             }
+            updateWordCount();
         }
+
+        // Insert table template
+        function insertTable() {
+            const table = '\n| หัวข้อ 1 | หัวข้อ 2 | หัวข้อ 3 |\n|---------|---------|---------|\n| ข้อมูล 1 | ข้อมูล 2 | ข้อมูล 3 |\n| ข้อมูล 4 | ข้อมูล 5 | ข้อมูล 6 |\n';
+            insertMD(table, '');
+        }
+
+        // Keyboard shortcuts
+        editorTextarea.addEventListener('keydown', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 'b') { e.preventDefault(); insertMD('**', '**'); }
+                if (e.key === 'i') { e.preventDefault(); insertMD('*', '*'); }
+                if (e.key === 'k') { e.preventDefault(); insertMD('[', '](url)'); }
+            }
+            // Tab key inserts spaces instead of changing focus
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const start = this.selectionStart;
+                this.value = this.value.substring(0, start) + '    ' + this.value.substring(this.selectionEnd);
+                this.selectionStart = this.selectionEnd = start + 4;
+            }
+        });
     </script>
 </body>
 

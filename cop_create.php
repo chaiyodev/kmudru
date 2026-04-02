@@ -74,6 +74,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
             grid-template-columns: 1.2fr 0.8fr;
             gap: 2.5rem;
         }
+        
+        @media (max-width: 1024px) {
+            .creator-split {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+            .creation-card {
+                padding: 1.5rem;
+            }
+            .preview-sticky {
+                position: relative;
+                top: 0;
+            }
+        }
 
         .creation-card {
             background: white;

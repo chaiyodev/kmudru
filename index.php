@@ -5,7 +5,7 @@ require_once 'includes/security.php';
 
 $pdo = get_pdo();
 $user = null;
-if (is_logged_in()) {
+if (is_logged_in() && $pdo) {
     $user_id = $_SESSION['user_id'];
     $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
     $stmt->execute([$user_id]);
@@ -39,7 +39,7 @@ if ($pdo) {
         $doc_query = "
             (SELECT d.id, d.title, d.content, d.type, d.category_id, d.user_id, d.views, d.created_at, d.tags,
                    c.name as category_name, c.icon as category_icon, 
-                   u.username as author_username, u.full_name as author_full_name,
+                   u.username as author_username, u.full_name as author_full_name, u.avatar as author_avatar,
                    (SELECT COUNT(*) FROM document_likes WHERE document_id = d.id) as like_count,
                    (SELECT COUNT(*) FROM comments WHERE document_id = d.id) as comment_count,
                    'view.php?id=' as base_url
@@ -50,7 +50,7 @@ if ($pdo) {
             UNION ALL
             (SELECT t.id, t.title, t.description as content, 'training' as type, t.category_id, NULL as user_id, 0 as views, t.created_at, '' as tags,
                    c.name as category_name, 'graduation-cap' as category_icon,
-                   'System' as author_username, 'UDRU Training' as author_full_name,
+                   'System' as author_username, 'UDRU Training' as author_full_name, NULL as author_avatar,
                    0 as like_count, 0 as comment_count,
                    'training_view.php?id=' as base_url
             FROM trainings t
@@ -60,10 +60,12 @@ if ($pdo) {
         $latest_docs = $pdo->query($doc_query)->fetchAll();
 
         // Update type labels for display
-        $type_labels['training'] = 'การฝึกอบรม';
-        $type_labels['document'] = 'เอกสาร';
-        $type_labels['wiki'] = 'Wiki';
-        $type_labels['qa'] = 'Q&A';
+        $type_labels = [
+            'document' => 'เอกสาร',
+            'wiki' => 'Wiki',
+            'qa' => 'Q&A',
+            'training' => 'การฝึกอบรม'
+        ];
 
         // Fetch trending topics
         $stmt = $pdo->query("SELECT c.id, c.name, COUNT(d.id) as doc_count FROM categories c LEFT JOIN documents d ON c.id = d.category_id GROUP BY c.id ORDER BY doc_count DESC LIMIT 8");
@@ -100,8 +102,6 @@ if ($pdo) {
     }
 }
 
-$type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q&A'];
-
 $page_title = 'UDRU Wisdom | UDRU Knowledge Hub';
 $extra_css = '<link rel="stylesheet" href="assets/css/index.css">';
 require_once 'includes/head.php';
@@ -134,23 +134,43 @@ require_once 'includes/head.php';
                 </div>
             </header>
 
-            <!-- Hero Section -->
-            <section class="hero-centered animate-slide-down">
-                <h1>สืบค้นองค์ความรู้ของมหาวิทยาลัย</h1>
-                <p>แหล่งรวบรวมเทคนิค วิจัย และแนวทางการทำงานที่ดีที่สุดของบุคลากร UDRU</p>
+            <!-- Premium Hero Section -->
+            <section class="hero-premium animate-fade-in">
+                <div class="hero-mask"></div>
+                <div class="hero-content">
+                    <span class="hero-tag">มหาวิทยาลัยราชภัฏอุดรธานี</span>
+                    <h1>ขุมปัญญาอัจฉริยะ <span>UDRU Wisdom</span></h1>
+                    <p>ศูนย์กลางการรวบรวมเทคนิค วิจัย และแนวทางการทำงานที่ดีที่สุด เพื่อสร้างสังคมแห่งการเรียนรู้ที่ยั่งยืน</p>
 
-                <div class="search-container-center">
-                    <form action="ai_assistant.php" method="GET" class="search-inner" id="main-search-form">
-                        <i data-lucide="search" id="search-icon" style="color: hsl(var(--muted-foreground));"></i>
-                        <input type="text" name="q" id="search-input" placeholder="พิมพ์สิ่งที่คุณต้องการค้นหา..."
-                            autofocus>
-                        <button type="button" onclick="toggleAI()" id="ai-toggle-btn" class="ai-badge"
-                            style="cursor: pointer; border: none; background: #f1f5f9; color: #64748b; font-size: 0.65rem; padding: 4px 8px; border-radius: 6px;">
-                            <i data-lucide="sparkles" style="width: 12px; height: 12px; margin-right: 4px;"></i> AI
-                            Mode: OFF
-                        </button>
-                        <button type="submit" class="btn-search-main">สืบค้น</button>
+                    <form action="browse.php" method="GET" class="hero-search-box">
+                        <div class="search-input-group">
+                            <i data-lucide="search" class="search-lead-icon"></i>
+                            <input type="text" name="q" placeholder="ค้นหาบทความ, งานวิจัย หรือชุดความรู้..." autocomplete="off">
+                            <button type="submit" class="hero-search-btn">
+                                <span>ค้นหาข้อมูล</span>
+                                <i data-lucide="arrow-right"></i>
+                            </button>
+                        </div>
+                        <div class="hero-quick-tags">
+                            <span>ยอดนิยม:</span>
+                            <a href="browse.php?q=AI">#AI</a>
+                            <a href="browse.php?q=วิจัย">#วิจัย</a>
+                            <a href="browse.php?q=KM">#KM</a>
+                        </div>
                     </form>
+                </div>
+                <div class="hero-visual" id="heroVisual">
+                    <div class="v-blob v-1"></div>
+                    <div class="v-blob v-2"></div>
+                    
+                    <!-- Premium Wisdom Aura -->
+                    <div class="hero-feather-wrapper" id="featherParallax">
+                        <div class="feather-glow"></div>
+                        <div class="wisdom-sparkle sparkle-1"></div>
+                        <div class="wisdom-sparkle sparkle-2"></div>
+                        <div class="wisdom-sparkle sparkle-3"></div>
+                        <div class="wisdom-sparkle sparkle-4"></div>
+                    </div>
                 </div>
             </section>
 
@@ -273,8 +293,8 @@ require_once 'includes/head.php';
 
                                 <div class="card-footer">
                                     <div class="footer-author">
-                                        <div class="author-sm-avatar">
-                                            <?php echo strtoupper(substr($doc['author_username'] ?? 'U', 0, 1)); ?>
+                                        <div class="author-sm-avatar" <?php if(!empty($doc['author_avatar']) && file_exists('uploads/avatars/' . $doc['author_avatar'])) echo 'style="background-image: url(\'uploads/avatars/' . htmlspecialchars($doc['author_avatar']) . '\'); background-size: cover; background-position: center; color: transparent; border: 1px solid var(--border-color);"'; ?>>
+                                            <?php if(empty($doc['author_avatar']) || !file_exists('uploads/avatars/' . $doc['author_avatar'])) echo mb_strtoupper(mb_substr($doc['author_username'] ?? 'U', 0, 1, 'UTF-8'), 'UTF-8'); ?>
                                         </div>
                                         <span
                                             class="author-sm-name"><?php echo e($doc['author_full_name'] ?? $doc['author_username'] ?? 'Anonymous'); ?></span>
@@ -372,6 +392,7 @@ require_once 'includes/head.php';
 <?php 
 $extra_js = <<<'HTML'
     <script>
+        // AI Toggle Logic
         let aiMode = false;
         function toggleAI() {
             aiMode = !aiMode;
@@ -396,6 +417,30 @@ $extra_js = <<<'HTML'
                 input.placeholder = "พิมพ์สิ่งที่คุณต้องการค้นหา...";
             }
             lucide.createIcons();
+        }
+
+        // Premium Feather Parallax Logic
+        const hero = document.querySelector('.hero-premium');
+        const feather = document.getElementById('featherParallax');
+        
+        if (hero && feather) {
+            hero.addEventListener('mousemove', (e) => {
+                const rect = hero.getBoundingClientRect();
+                const x = ((e.clientX - rect.left) / rect.width) - 0.5;
+                const y = ((e.clientY - rect.top) / rect.height) - 0.5;
+                
+                requestAnimationFrame(() => {
+                    // Subtle movement and rotation based on mouse position
+                    feather.style.transform = `translate(${x * 40}px, ${y * 40}px) rotate(${x * 10}deg)`;
+                });
+            });
+            
+            // Return to center when mouse leaves
+            hero.addEventListener('mouseleave', () => {
+                requestAnimationFrame(() => {
+                    feather.style.transform = `translate(0, 0) rotate(0deg)`;
+                });
+            });
         }
     </script>
 HTML;

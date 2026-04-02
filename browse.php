@@ -9,15 +9,41 @@ $cat_id = isset($_GET['cat_id']) ? (int) $_GET['cat_id'] : 0;
 $docs = [];
 $stats = ['document' => 0, 'wiki' => 0, 'qa' => 0, 'total' => 0];
 
+$cat_name = '';
+if ($cat_id > 0) {
+    $c_stmt = $pdo->prepare("SELECT name FROM categories WHERE id = ?");
+    $c_stmt->execute([$cat_id]);
+    $cat_name = $c_stmt->fetchColumn();
+    // If search is empty, we can show category name in search box for clarity
+    if (empty($search)) {
+        // Option 1: Set search to cat_name to mimic previous behavior but with correct filtering
+        // $search = $cat_name; 
+    }
+}
+
 if ($pdo) {
-    // Fetch counts for sidebar
-    $count_stmt = $pdo->query("SELECT type, COUNT(*) as count FROM documents GROUP BY type");
+    // Dynamic counts for tabs based on current filters (except type itself)
+    $count_query = "SELECT type, COUNT(*) as count FROM documents d WHERE 1=1";
+    $count_params = [];
+    if (!empty($search)) {
+        $count_query .= " AND (title LIKE ? OR content LIKE ?)";
+        $count_params[] = "%$search%";
+        $count_params[] = "%$search%";
+    }
+    if ($cat_id > 0) {
+        $count_query .= " AND category_id = ?";
+        $count_params[] = $cat_id;
+    }
+    $count_query .= " GROUP BY type";
+    
+    $count_stmt = $pdo->prepare($count_query);
+    $count_stmt->execute($count_params);
     while ($row = $count_stmt->fetch()) {
         $stats[$row['type']] = $row['count'];
         $stats['total'] += $row['count'];
     }
 
-    $query = "SELECT d.*, c.name as category_name, u.username as author_username, u.full_name as author_name,
+    $query = "SELECT d.*, c.name as category_name, u.username as author_username, u.full_name as author_name, u.avatar as author_avatar,
               (SELECT COUNT(*) FROM document_likes WHERE document_id = d.id) as like_count,
               (SELECT COUNT(*) FROM comments WHERE document_id = d.id) as comment_count
               FROM documents d 
@@ -88,20 +114,28 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                 <form action="browse.php" method="GET" class="search-inner">
                     <i data-lucide="search" style="color: hsl(var(--muted-foreground));"></i>
                     <input type="text" name="search" placeholder="พิมพ์สิ่งที่คุณต้องการค้นหา..."
-                        value="<?php echo htmlspecialchars($search); ?>">
+                        value="<?php echo htmlspecialchars(!empty($search) ? $search : $cat_name); ?>">
                     <input type="hidden" name="type" value="<?php echo htmlspecialchars($type); ?>">
+                    <?php if ($cat_id > 0): ?>
+                        <input type="hidden" name="cat_id" value="<?php echo $cat_id; ?>">
+                    <?php endif; ?>
                     <kbd
                         style="font-size: 0.75rem; background: hsl(var(--muted)); padding: 4px 8px; border-radius: 6px; font-weight: 700; color: hsl(var(--muted-foreground));">⌘
                         K</kbd>
                     <button type="submit" class="btn-search-main">สืบค้น</button>
+                    <!-- Clear Category filter if present -->
+                    <?php if ($cat_id > 0): ?>
+                        <a href="browse.php?search=<?php echo urlencode($search); ?>&type=<?php echo urlencode($type); ?>" 
+                           class="btn-search-main" style="background: #f1f5f9; color: #64748b; margin-left: 8px;">ล้างหมวดหมู่</a>
+                    <?php endif; ?>
                 </form>
             </div>
 
             <div class="filter-tabs">
-                <a href="browse.php?search=<?php echo urlencode($search); ?>"
+                <a href="browse.php?search=<?php echo urlencode($search); ?>&cat_id=<?php echo $cat_id; ?>"
                     class="tab-pill <?php echo empty($type) ? 'active' : ''; ?>">ทั้งหมด</a>
                 <?php foreach ($type_labels as $val => $label): ?>
-                    <a href="browse.php?type=<?php echo $val; ?>&search=<?php echo urlencode($search); ?>"
+                    <a href="browse.php?type=<?php echo $val; ?>&search=<?php echo urlencode($search); ?>&cat_id=<?php echo $cat_id; ?>"
                         class="tab-pill <?php echo $type == $val ? 'active' : ''; ?>">
                         <?php echo $label; ?>
                         <span style="opacity: 0.5; margin-left: 4px; font-size: 0.7rem;"><?php echo $stats[$val]; ?></span>
@@ -150,8 +184,8 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                             </p>
                             <div class="card-footer">
                                 <div class="card-author">
-                                    <div class="author-avatar">
-                                        <?php echo strtoupper(substr($doc['author_username'] ?? 'U', 0, 2)); ?>
+                                    <div class="author-avatar" <?php if(!empty($doc['author_avatar']) && file_exists('uploads/avatars/' . $doc['author_avatar'])) echo 'style="background-image: url(\'uploads/avatars/' . htmlspecialchars($doc['author_avatar']) . '\'); background-size: cover; background-position: center; color: transparent; border: 1px solid var(--border-color);"'; ?>>
+                                        <?php if(empty($doc['author_avatar']) || !file_exists('uploads/avatars/' . $doc['author_avatar'])) echo mb_strtoupper(mb_substr($doc['author_username'] ?? 'U', 0, 2, 'UTF-8'), 'UTF-8'); ?>
                                     </div>
                                     <span
                                         class="author-name"><?php echo htmlspecialchars($doc['author_name'] ?? 'UDRU User'); ?></span>

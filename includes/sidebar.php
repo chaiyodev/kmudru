@@ -127,7 +127,7 @@ if (is_logged_in()) {
                     $current_avatar = !empty($sidebar_user['avatar']) ? $sidebar_user['avatar'] : ($_SESSION['avatar'] ?? '');
                     $avatar_url = !empty($current_avatar) ? 'uploads/avatars/' . $current_avatar : '';
                     $has_avatar = !empty($current_avatar) && file_exists(__DIR__ . '/../' . $avatar_url);
-                    $initials = strtoupper(substr($_SESSION['username'] ?? 'U', 0, 1));
+                    $initials = mb_strtoupper(mb_substr($_SESSION['username'] ?? 'U', 0, 1, 'UTF-8'), 'UTF-8');
                     ?>
                     <div class="profile-avatar"
                         style="<?php echo $has_avatar ? "background-image: url('$avatar_url'); background-size: cover; background-position: center; width: 44px; height: 44px;" : "width: 44px; height: 44px;"; ?>">

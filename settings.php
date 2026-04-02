@@ -204,6 +204,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-weight: 700;
             color: #64748b;
         }
+
+        .form-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .settings-layout {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+                padding: 1.5rem;
+            }
+            .settings-content {
+                padding-left: 0;
+                border-left: none;
+                border-top: 1px solid var(--border-color);
+                padding-top: 1.5rem;
+            }
+            .form-grid-2 {
+                grid-template-columns: 1fr;
+            }
+            .settings-nav {
+                flex-direction: row;
+                overflow-x: auto;
+                padding-bottom: 0.5rem;
+            }
+            .settings-nav-link {
+                white-space: nowrap;
+                width: auto;
+                padding: 0.5rem 1rem;
+            }
+            /* Hide the version text on mobile so nav fits better */
+            .settings-version-text {
+                display: none;
+            }
+        }
     </style>
 </head>
 
@@ -229,7 +266,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             data-lucide="shield"></i>ความปลอดภัย</button>
                     <button onclick="showSection('display')" class="settings-nav-link" id="nav-display"><i
                             data-lucide="monitor"></i>การแสดงผล</button>
-                    <div
+                    <div class="settings-version-text"
                         style="margin-top: auto; padding: 1rem; background: hsl(var(--primary)/0.05); border-radius: 0.75rem; font-size: 0.75rem; color: var(--teal-primary);">
                         <i data-lucide="info"
                             style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i>
@@ -248,7 +285,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <input type="text" name="full_name" class="form-input"
                                     value="<?php echo htmlspecialchars($user_data['full_name']); ?>" required>
                             </div>
-                            <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                            <div class="form-group form-grid-2">
                                 <div>
                                     <label class="form-label">อีเมลติดต่อ</label>
                                     <input type="email" name="email" class="form-input"

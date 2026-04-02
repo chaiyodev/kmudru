@@ -153,7 +153,12 @@ $users = $pdo->query("SELECT * FROM users ORDER BY created_at DESC")->fetchAll()
                                     <?php echo $user['id']; ?>
                                 </td>
                                 <td style="padding: 1rem; font-weight: 600;">
-                                    <?php echo htmlspecialchars($user['username']); ?>
+                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                        <div class="avatar-sm" style="width: 24px; height: 24px; font-size: 10px; <?php if(!empty($user['avatar']) && file_exists('uploads/avatars/'.$user['avatar'])) echo "background-image: url('uploads/avatars/".htmlspecialchars($user['avatar'])."'); background-size: cover; background-position: center; color: transparent;"; ?>">
+                                            <?php if(empty($user['avatar']) || !file_exists('uploads/avatars/'.$user['avatar'])) echo mb_strtoupper(mb_substr($user['username'], 0, 1, 'UTF-8'), 'UTF-8'); ?>
+                                        </div>
+                                        <?php echo htmlspecialchars($user['username']); ?>
+                                    </div>
                                 </td>
                                 <td style="padding: 1rem;">
                                     <?php echo htmlspecialchars($user['full_name']); ?>

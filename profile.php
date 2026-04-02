@@ -170,7 +170,7 @@ require_once 'includes/head.php';
                             <?php
                             $avatar_url = !empty($user_info['avatar']) ? 'uploads/avatars/' . $user_info['avatar'] : '';
                             $has_avatar = !empty($avatar_url) && file_exists(__DIR__ . '/' . $avatar_url);
-                            $initials = strtoupper(substr($user_info['username'], 0, 1));
+                            $initials = mb_strtoupper(mb_substr($user_info['username'], 0, 1, 'UTF-8'), 'UTF-8');
                             ?>
                             <div class="avatar-preview-wrapper" id="avatar-preview"
                                 style="<?php echo $has_avatar ? "background-image: url('$avatar_url');" : ""; ?>">

@@ -277,7 +277,51 @@ if (isset($_GET['status']) && $_GET['status'] == 'created') {
             color: #047857;
             font-weight: 600;
         }
+
+        @media (max-width: 1024px) {
+            .creation-card {
+                padding: 1.5rem;
+            }
+            .step-tabs {
+                overflow-x: auto;
+                padding-bottom: 0.5rem;
+                -webkit-overflow-scrolling: touch;
+            }
+            .step-tab {
+                flex-shrink: 0;
+                padding: 0.6rem 1rem;
+                font-size: 0.875rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .basic-info-grid {
+                grid-template-columns: 1fr !important;
+                gap: 1rem !important;
+            }
+            .thumbnail-level-grid {
+                grid-template-columns: 1fr !important;
+                gap: 1.5rem !important;
+            }
+            .level-options {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            .level-label {
+                padding: 0.6rem;
+            }
+            .form-actions {
+                flex-direction: column;
+                gap: 0.5rem !important;
+            }
+            .btn-primary {
+                width: 100%;
+                justify-content: center;
+            }
+        }
     </style>
+
+
 </head>
 
 <body>
@@ -341,7 +385,7 @@ if (isset($_GET['status']) && $_GET['status'] == 'created') {
                                         placeholder="ชื่อวิชาหรือหัวข้อการเรียนรู้" required>
                                 </div>
 
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                                <div class="basic-info-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
                                     <div class="form-group">
                                         <label class="form-label">หมวดหมู่</label>
                                         <select name="category_id" class="form-input" required>
@@ -364,7 +408,7 @@ if (isset($_GET['status']) && $_GET['status'] == 'created') {
 
                             <div class="form-section">
                                 <h3 class="section-title"><i data-lucide="image"></i> รูปปกและระดับความยาก</h3>
-                                <div style="display: grid; grid-template-columns: 350px 1fr; gap: 2rem;">
+                                <div class="thumbnail-level-grid" style="display: grid; grid-template-columns: 350px 1fr; gap: 2rem;">
                                     <div class="upload-area" onclick="document.getElementById('thumb-input').click()">
                                         <input type="file" name="thumbnail" id="thumb-input" accept="image/*"
                                             style="display: none;" onchange="previewImage(this)">
@@ -419,7 +463,7 @@ if (isset($_GET['status']) && $_GET['status'] == 'created') {
                                 </div>
                             </div>
 
-                            <div style="display: flex; gap: 1rem;">
+                            <div class="form-actions" style="display: flex; gap: 1rem;">
                                 <button type="submit" class="btn-primary" style="padding: 1rem 3rem;">
                                     <?php echo $id > 0 ? 'บันทึกการแก้ไข' : 'บันทึกและไปขั้นตอนต่อไป'; ?>
                                 </button>
@@ -444,7 +488,7 @@ if (isset($_GET['status']) && $_GET['status'] == 'created') {
                                     <input type="text" name="lesson_title" class="form-input" placeholder="เช่น บทนำกราฟิก"
                                         required>
                                 </div>
-                                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                                <div class="basic-info-grid" style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                                     <div>
                                         <label class="form-label">YouTube URL</label>
                                         <input type="url" name="video_url" class="form-input"
@@ -511,7 +555,7 @@ if (isset($_GET['status']) && $_GET['status'] == 'created') {
                                     <label class="form-label">คำถาม</label>
                                     <textarea name="question" class="form-input" rows="2" required></textarea>
                                 </div>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                                <div class="basic-info-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                                     <input type="text" name="option_a" class="form-input" placeholder="ก (Option A)"
                                         required>
                                     <input type="text" name="option_b" class="form-input" placeholder="ข (Option B)"

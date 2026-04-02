@@ -16,7 +16,7 @@ $total_comments = $pdo->query("SELECT COUNT(*) FROM comments")->fetchColumn() ??
 
 // Top Contributors
 $contributors = $pdo->query("
-    SELECT u.full_name, u.username, COUNT(d.id) as doc_count, u.points 
+    SELECT u.full_name, u.username, u.avatar, COUNT(d.id) as doc_count, u.points 
     FROM users u 
     LEFT JOIN documents d ON u.id = d.user_id 
     GROUP BY u.id 
@@ -179,195 +179,184 @@ if (array_sum($monthly_values) == 0) {
             </header>
 
             <!-- Primary Stats Row -->
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; margin-bottom: 2rem;">
+            <div class="analytics-grid-4">
                 <div class="stat-card">
-                    <div
-                        style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
-                        <div class="stat-card-icon"
-                            style="background: hsl(var(--primary)/0.1); color: var(--teal-primary);"><i
-                                data-lucide="file-text"></i></div>
-                        <div class="trend-up"><i data-lucide="trending-up" style="width: 14px; height: 14px;"></i> 12%
+                    <div class="stat-card-header">
+                        <div class="stat-card-icon" style="background: rgba(20, 184, 166, 0.1); color: var(--teal-primary);">
+                            <i data-lucide="file-text"></i>
                         </div>
+                        <div class="trend-up"><i data-lucide="trending-up"></i> 12%</div>
                     </div>
-                    <div style="font-size: 2rem; font-weight: 800; margin-bottom: 0.25rem;"><?php echo $total_docs; ?>
-                    </div>
-                    <div style="font-size: 0.8125rem; color: hsl(var(--muted-foreground));">เอกสารทั้งหมด</div>
+                    <div class="stat-card-value"><?php echo number_format($total_docs); ?></div>
+                    <div class="stat-card-label">เอกสารทั้งหมด</div>
                 </div>
                 <div class="stat-card">
-                    <div
-                        style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
-                        <div class="stat-card-icon" style="background: hsl(45 93% 47%/0.1); color: hsl(45 93% 47%);"><i
-                                data-lucide="book"></i></div>
-                        <div class="trend-up"><i data-lucide="trending-up" style="width: 14px; height: 14px;"></i> 8%
+                    <div class="stat-card-header">
+                        <div class="stat-card-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
+                            <i data-lucide="book"></i>
                         </div>
+                        <div class="trend-up"><i data-lucide="trending-up"></i> 8%</div>
                     </div>
-                    <div style="font-size: 2rem; font-weight: 800; margin-bottom: 0.25rem;"><?php echo $total_wiki; ?>
-                    </div>
-                    <div style="font-size: 0.8125rem; color: hsl(var(--muted-foreground));">บทความ Wiki</div>
+                    <div class="stat-card-value"><?php echo number_format($total_wiki); ?></div>
+                    <div class="stat-card-label">บทความ Wiki</div>
                 </div>
                 <div class="stat-card">
-                    <div
-                        style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
-                        <div class="stat-card-icon" style="background: hsl(262 83% 58%/0.1); color: hsl(262 83% 58%);">
+                    <div class="stat-card-header">
+                        <div class="stat-card-icon" style="background: rgba(139, 92, 246, 0.1); color: #8b5cf6;">
                             <i data-lucide="help-circle"></i>
                         </div>
-                        <div class="trend-up"><i data-lucide="trending-up" style="width: 14px; height: 14px;"></i> 5%
-                        </div>
+                        <div class="trend-up"><i data-lucide="trending-up"></i> 5%</div>
                     </div>
-                    <div style="font-size: 2rem; font-weight: 800; margin-bottom: 0.25rem;"><?php echo $total_qa; ?>
-                    </div>
-                    <div style="font-size: 0.8125rem; color: hsl(var(--muted-foreground));">คำถาม Q&A</div>
+                    <div class="stat-card-value"><?php echo number_format($total_qa); ?></div>
+                    <div class="stat-card-label">คำถาม Q&A</div>
                 </div>
                 <div class="stat-card">
-                    <div
-                        style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
-                        <div class="stat-card-icon" style="background: hsl(142 76% 36%/0.1); color: hsl(142 76% 36%);">
+                    <div class="stat-card-header">
+                        <div class="stat-card-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
                             <i data-lucide="graduation-cap"></i>
                         </div>
-                        <div class="trend-neutral">ใหม่</div>
+                        <div class="trend-neutral">NEW</div>
                     </div>
-                    <div style="font-size: 2rem; font-weight: 800; margin-bottom: 0.25rem;">
-                        <?php echo $total_training; ?>
-                    </div>
-                    <div style="font-size: 0.8125rem; color: hsl(var(--muted-foreground));">หลักสูตรอบรม</div>
+                    <div class="stat-card-value"><?php echo number_format($total_training); ?></div>
+                    <div class="stat-card-label">หลักสูตรอบรม</div>
                 </div>
             </div>
 
             <!-- Secondary Stats Row -->
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; margin-bottom: 2rem;">
-                <div class="stat-card" style="display: flex; align-items: center; gap: 1rem;">
-                    <div class="stat-card-icon"
-                        style="background: hsl(var(--muted)); color: hsl(var(--muted-foreground));"><i
-                            data-lucide="users"></i></div>
+            <div class="analytics-grid-4 small-stats">
+                <div class="stat-card-mini">
+                    <div class="stat-card-icon-sm"><i data-lucide="users"></i></div>
                     <div>
-                        <div style="font-size: 0.75rem; color: hsl(var(--muted-foreground));">ผู้ใช้งาน</div>
-                        <div style="font-size: 1.5rem; font-weight: 800;"><?php echo $total_users; ?></div>
+                        <div class="stat-mini-label">ผู้ใช้งาน</div>
+                        <div class="stat-mini-value"><?php echo number_format($total_users); ?></div>
                     </div>
                 </div>
-                <div class="stat-card" style="display: flex; align-items: center; gap: 1rem;">
-                    <div class="stat-card-icon"
-                        style="background: hsl(var(--muted)); color: hsl(var(--muted-foreground));"><i
-                            data-lucide="eye"></i></div>
+                <div class="stat-card-mini">
+                    <div class="stat-card-icon-sm"><i data-lucide="eye"></i></div>
                     <div>
-                        <div style="font-size: 0.75rem; color: hsl(var(--muted-foreground));">ยอดเข้าชม</div>
-                        <div style="font-size: 1.5rem; font-weight: 800;"><?php echo number_format($total_views); ?>
-                        </div>
+                        <div class="stat-mini-label">ยอดเข้าชม</div>
+                        <div class="stat-mini-value"><?php echo number_format($total_views); ?></div>
                     </div>
                 </div>
-                <div class="stat-card" style="display: flex; align-items: center; gap: 1rem;">
-                    <div class="stat-card-icon" style="background: hsl(339 90% 50%/0.1); color: hsl(339 90% 50%);"><i
-                            data-lucide="heart"></i></div>
+                <div class="stat-card-mini">
+                    <div class="stat-card-icon-sm" style="background: rgba(236, 72, 153, 0.1); color: #ec4899;"><i data-lucide="heart"></i></div>
                     <div>
-                        <div style="font-size: 0.75rem; color: hsl(var(--muted-foreground));">ยอดถูกใจ</div>
-                        <div style="font-size: 1.5rem; font-weight: 800;"><?php echo $total_likes; ?></div>
+                        <div class="stat-mini-label">ยอดถูกใจ</div>
+                        <div class="stat-mini-value"><?php echo number_format($total_likes); ?></div>
                     </div>
                 </div>
-                <div class="stat-card" style="display: flex; align-items: center; gap: 1rem;">
-                    <div class="stat-card-icon" style="background: hsl(199 89% 48%/0.1); color: hsl(199 89% 48%);"><i
-                            data-lucide="message-square"></i></div>
+                <div class="stat-card-mini">
+                    <div class="stat-card-icon-sm" style="background: rgba(6, 182, 212, 0.1); color: #06b6d4;"><i data-lucide="message-square"></i></div>
                     <div>
-                        <div style="font-size: 0.75rem; color: hsl(var(--muted-foreground));">การมีส่วนร่วม</div>
-                        <div style="font-size: 1.5rem; font-weight: 800;"><?php echo $total_comments; ?></div>
+                        <div class="stat-mini-label">การมีส่วนร่วม</div>
+                        <div class="stat-mini-value"><?php echo number_format($total_comments); ?></div>
                     </div>
                 </div>
             </div>
 
             <!-- Charts Row -->
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; margin-bottom: 2rem;">
+            <div class="analytics-charts-grid">
                 <!-- Area Chart -->
                 <div class="chart-card">
-                    <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem;">แนวโน้มการเข้าชม</h3>
-                    <p style="font-size: 0.8125rem; color: hsl(var(--muted-foreground)); margin-bottom: 1.5rem;">
-                        จำนวนการเข้าชมรายเดือน (6 เดือนล่าสุด)</p>
-                    <div style="height: 300px; position: relative; width: 100%;">
+                    <div class="chart-header">
+                        <div>
+                            <h3>แนวโน้มการเข้าชม</h3>
+                            <p>จำนวนการเข้าชมรายเดือน (6 เดือนล่าสุด)</p>
+                        </div>
+                        <div class="chart-actions">
+                            <span class="badge-blue">LIVE</span>
+                        </div>
+                    </div>
+                    <div class="chart-container">
                         <canvas id="trafficChart"></canvas>
                     </div>
                 </div>
 
                 <!-- Donut Chart -->
                 <div class="chart-card">
-                    <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem;">สัดส่วนประเภทเนื้อหา</h3>
-                    <p style="font-size: 0.8125rem; color: hsl(var(--muted-foreground)); margin-bottom: 1.5rem;">
-                        การกระจายตัวของเนื้อหาในระบบ</p>
-                    <div style="display: flex; align-items: center; justify-content: center;">
-                        <canvas id="contentChart" width="200" height="200"></canvas>
+                    <div class="chart-header">
+                        <div>
+                            <h3>สัดส่วนประเภทเนื้อหา</h3>
+                            <p>การกระจายตัวของเนื้อหาในระบบ</p>
+                        </div>
                     </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 1.5rem;">
-                        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem;"><span
-                                style="width: 12px; height: 12px; background: #3B82F6; border-radius: 3px;"></span>เอกสาร
-                            (<?php echo $pct_docs; ?>%)</div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem;"><span
-                                style="width: 12px; height: 12px; background: #8B5CF6; border-radius: 3px;"></span>Wiki
-                            (<?php echo $pct_wiki; ?>%)</div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem;"><span
-                                style="width: 12px; height: 12px; background: #F59E0B; border-radius: 3px;"></span>Q&A
-                            (<?php echo $pct_qa; ?>%)</div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem;"><span
-                                style="width: 12px; height: 12px; background: #10B981; border-radius: 3px;"></span>อบรม
-                            (<?php echo $pct_training; ?>%)</div>
+                    <div class="donut-container">
+                        <canvas id="contentChart"></canvas>
+                    </div>
+                    <div class="donut-legend">
+                        <div class="legend-item"><span class="dot" style="background: #3B82F6;"></span>เอกสาร (<?php echo $pct_docs; ?>%)</div>
+                        <div class="legend-item"><span class="dot" style="background: #8B5CF6;"></span>Wiki (<?php echo $pct_wiki; ?>%)</div>
+                        <div class="legend-item"><span class="dot" style="background: #F59E0B;"></span>Q&A (<?php echo $pct_qa; ?>%)</div>
+                        <div class="legend-item"><span class="dot" style="background: #10B981;"></span>อบรม (<?php echo $pct_training; ?>%)</div>
                     </div>
                 </div>
             </div>
 
             <!-- Contributors & Activity -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+            <div class="analytics-footer-grid">
                 <!-- Top Contributors -->
                 <div class="chart-card">
-                    <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem;">ผู้ร่วมขับเคลื่อนความรู้</h3>
-                    <p style="font-size: 0.8125rem; color: hsl(var(--muted-foreground)); margin-bottom: 1.5rem;">Top 5
-                        อันดับแรก</p>
-
-                    <?php foreach ($contributors as $i => $c):
-                        $width = ($max_docs > 0) ? ($c['doc_count'] / $max_docs) * 100 : 0;
-                        ?>
-                        <div class="contributor-row">
-                            <span
-                                style="font-size: 0.875rem; font-weight: 700; color: hsl(var(--muted-foreground)); width: 20px;">#<?php echo $i + 1; ?></span>
-                            <div class="contributor-avatar"><?php echo strtoupper(substr($c['username'], 0, 1)); ?></div>
-                            <div style="flex: 1;">
-                                <div style="font-size: 0.875rem; font-weight: 600; margin-bottom: 4px;">
-                                    <?php echo htmlspecialchars($c['full_name']); ?>
-                                </div>
-                                <div class="contributor-bar">
-                                    <div class="contributor-bar-fill" style="width: <?php echo $width; ?>%;"></div>
-                                </div>
-                            </div>
-                            <span
-                                style="font-size: 0.875rem; font-weight: 700; color: var(--teal-primary);"><?php echo $c['doc_count']; ?></span>
-                        </div>
-                    <?php endforeach; ?>
-                    <?php if (empty($contributors)): ?>
-                        <p style="text-align: center; color: hsl(var(--muted-foreground)); padding: 2rem;">ยังไม่มีข้อมูล
-                        </p>
-                    <?php endif; ?>
-                </div>
-
-                <!-- Quick Actions -->
-                <div class="chart-card"
-                    style="background: linear-gradient(135deg, var(--teal-primary) 0%, hsl(174 62% 42%) 100%); color: white; border: none;">
-                    <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem;">เป้าหมาย KM ประจำปี</h3>
-                    <p style="font-size: 0.8125rem; opacity: 0.9; margin-bottom: 2rem;">ติดตามความก้าวหน้าของทีม</p>
-
-                    <?php $target = 100;
-                    $progress = min(100, round((($total_docs + $total_wiki + $total_qa) / $target) * 100)); ?>
-
-                    <div style="font-size: 4rem; font-weight: 900; margin-bottom: 0.5rem;"><?php echo $progress; ?><span
-                            style="font-size: 2rem;">%</span></div>
-                    <div
-                        style="height: 12px; background: rgba(255,255,255,0.2); border-radius: 6px; margin-bottom: 1rem; overflow: hidden;">
-                        <div
-                            style="height: 100%; width: <?php echo $progress; ?>%; background: white; border-radius: 6px; transition: width 1s ease;">
+                    <div class="chart-header">
+                        <div>
+                            <h3>ผู้ร่วมขับเคลื่อนความรู้</h3>
+                            <p>Top 5 อันดับแรกที่มีส่วนร่วมสูงสุด</p>
                         </div>
                     </div>
-                    <p style="font-size: 0.8125rem; opacity: 0.9;">สร้างเนื้อหาอีก
-                        <?php echo max(0, $target - ($total_docs + $total_wiki + $total_qa)); ?> รายการเพื่อบรรลุ KPI
-                    </p>
 
-                    <a href="<?php echo is_logged_in() ? 'create.php' : 'javascript:void(0)'; ?>" 
-                       onclick="<?php echo is_logged_in() ? '' : "return requireLoginPrompt('สร้างเนื้อหาใหม่เพื่อบรรลุเป้าหมาย')"; ?>" 
-                       class="btn-primary"
-                        style="background: white; color: var(--teal-primary); margin-top: 2rem; width: 100%; justify-content: center;"><i
-                            data-lucide="plus"></i>สร้างเนื้อหาใหม่</a>
+                    <div class="contributors-list">
+                        <?php foreach ($contributors as $i => $c):
+                            $width = ($max_docs > 0) ? ($c['doc_count'] / $max_docs) * 100 : 0;
+                            ?>
+                            <div class="contributor-row">
+                                <span class="rank-num">#<?php echo $i + 1; ?></span>
+                                <div class="contributor-avatar" style="<?php if(!empty($c['avatar']) && file_exists('uploads/avatars/'.$c['avatar'])) echo "background-image: url('uploads/avatars/".htmlspecialchars($c['avatar'])."'); background-size: cover; background-position: center; color: transparent;"; ?>">
+                                    <?php if(empty($c['avatar']) || !file_exists('uploads/avatars/'.$c['avatar'])) echo mb_strtoupper(mb_substr($c['username'], 0, 1, 'UTF-8'), 'UTF-8'); ?>
+                                </div>
+                                <div class="contributor-info">
+                                    <div class="contributor-name"><?php echo htmlspecialchars($c['full_name']); ?></div>
+                                    <div class="contributor-bar">
+                                        <div class="contributor-bar-fill" style="width: <?php echo $width; ?>%;"></div>
+                                    </div>
+                                </div>
+                                <span class="contributor-count"><?php echo number_format($c['doc_count']); ?></span>
+                            </div>
+                        <?php endforeach; ?>
+                        <?php if (empty($contributors)): ?>
+                            <div class="empty-state">
+                                <i data-lucide="inbox"></i>
+                                <p>ยังไม่มีข้อมูลผู้ร่วมขับเคลื่อน</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <!-- KPI Card -->
+                <div class="kpi-card">
+                    <div class="kpi-content">
+                        <h3>เป้าหมาย KM ประจำปี</h3>
+                        <p>ติดตามความก้าวหน้าของทีม UDRU KM</p>
+
+                        <?php $target = 100;
+                        $progress = min(100, round((($total_docs + $total_wiki + $total_qa) / $target) * 100)); ?>
+
+                        <div class="kpi-value-container">
+                            <span class="kpi-number"><?php echo $progress; ?></span>
+                            <span class="kpi-percent">%</span>
+                        </div>
+                        
+                        <div class="kpi-progress-wrapper">
+                            <div class="kpi-progress-bar" style="width: <?php echo $progress; ?>%;"></div>
+                        </div>
+                        
+                        <p class="kpi-hint">สร้างเนื้อหาอีก <strong><?php echo max(0, $target - ($total_docs + $total_wiki + $total_qa)); ?></strong> รายการเพื่อบรรลุเป้าหมาย</p>
+
+                        <a href="<?php echo is_logged_in() ? 'create.php' : 'javascript:void(0)'; ?>" 
+                           onclick="<?php echo is_logged_in() ? '' : "return requireLoginPrompt('สร้างเนื้อหาใหม่เพื่อบรรลุเป้าหมาย')"; ?>" 
+                           class="btn-kpi-action">
+                           <i data-lucide="plus"></i>สร้างเนื้อหาใหม่
+                        </a>
+                    </div>
+                    <div class="kpi-bg-icon"><i data-lucide="target"></i></div>
                 </div>
             </div>
         </main>

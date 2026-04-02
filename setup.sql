@@ -1,6 +1,6 @@
 -- Database Schema for UDRU Wisdom Knowledge Management System
-CREATE DATABASE IF NOT EXISTS kmud_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE kmud_db;
+CREATE DATABASE IF NOT EXISTS udruwisdom DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE udruwisdom;
 
 -- 1. Users table
 CREATE TABLE IF NOT EXISTS users (

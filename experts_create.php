@@ -84,6 +84,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             padding: 3rem;
             box-shadow: rgba(20, 29, 31, 0.05) 0px 1px 2px 0px;
         }
+
+        @media (max-width: 640px) {
+            .experts-form {
+                padding: 1.5rem;
+            }
+        }
     </style>
 </head>
 
@@ -134,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <?php
                             $avatar_url = !empty($user_data['avatar']) ? 'uploads/avatars/' . $user_data['avatar'] : '';
                             $has_avatar = !empty($avatar_url) && file_exists(__DIR__ . '/' . $avatar_url);
-                            $initials = strtoupper(substr($user_data['username'], 0, 1));
+                            $initials = mb_strtoupper(mb_substr($user_data['username'], 0, 1, 'UTF-8'), 'UTF-8');
                             ?>
                             <div class="avatar-preview-wrapper" id="avatar-preview"
                                 style="<?php echo $has_avatar ? "background-image: url('$avatar_url');" : ""; ?>">

@@ -15,13 +15,18 @@ $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
     verify_csrf_token($_POST['csrf_token'] ?? '');
-    $title = $_POST['title'];
-    $category_id = $_POST['category_id'];
-    $description = $_POST['description'];
-    $tags = $_POST['tags'];
+    $title = trim($_POST['title'] ?? '');
+    $category_id = (int)($_POST['category_id'] ?? 0);
+    $description = trim($_POST['description'] ?? '');
+    $tags = trim($_POST['tags'] ?? '');
     $user_id = $_SESSION['user_id'];
 
-    if (isset($_FILES['file']) && $_FILES['file']['error'] === 0) {
+    $has_file = isset($_FILES['file']) && $_FILES['file']['error'] === 0;
+    
+    if (empty($title)) {
+        $error = "กรุณากรอกชื่อเอกสาร";
+    } else if ($has_file) {
+        // File was uploaded - validate and save
         $upload_dir = 'uploads/';
         if (!is_dir($upload_dir))
             mkdir($upload_dir, 0777, true);
@@ -79,7 +84,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
             $error = "ไม่สามารถย้ายไฟล์ที่อัปโหลดได้";
         }
     } else {
-        $error = "กรุณาเลือกไฟล์ที่ต้องการอัปโหลด";
+        // No file uploaded - create document with description only
+        try {
+            $stmt = $pdo->prepare("INSERT INTO documents (title, content, category_id, user_id, type, tags, status) VALUES (?, ?, ?, ?, 'document', ?, 'published')");
+            $stmt->execute([$title, $description, $category_id, $user_id, $tags]);
+            log_activity('document_create', 'document', "Title: $title");
+            $message = "สร้างเอกสารเรียบร้อยแล้ว!";
+        } catch (Exception $e) {
+            $error = "เกิดข้อผิดพลาด: " . $e->getMessage();
+        }
     }
 }
 ?>
@@ -128,7 +141,7 @@ require_once 'includes/head.php';
                 </script>
             <?php endif; ?>
 
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2.5rem;">
+            <div class="upload-grid">
                 <form action="upload.php" method="POST" enctype="multipart/form-data">
                     <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                     <div id="drop-zone" class="upload-zone">
@@ -171,7 +184,7 @@ require_once 'includes/head.php';
                                 placeholder="เช่น คู่มือ, IT, วิจัย (คั่นด้วยคอมม่า)">
                         </div>
 
-                        <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+                        <div class="form-actions">
                             <button type="submit" class="btn-primary"
                                 style="flex: 1; justify-content: center;">ยืนยันการอัปโหลด</button>
                             <a href="index.php" class="btn-primary"

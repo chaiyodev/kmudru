@@ -115,6 +115,25 @@ $progress_percent = $total_lessons > 0 ? round(($completed_count / $total_lesson
             overflow: hidden;
         }
 
+        @media (max-width: 1024px) {
+            .player-grid {
+                grid-template-columns: 1fr;
+                height: auto;
+                overflow-y: auto;
+            }
+            .playlist-sidebar {
+                border-left: none;
+                border-top: 1px solid var(--border-color);
+                max-height: 500px;
+            }
+            .main-stage {
+                padding: 1.5rem 1rem;
+                height: auto;
+                overflow: visible;
+            }
+        }
+
+
         .main-stage {
             padding: 2rem;
             overflow-y: auto;
@@ -258,17 +277,16 @@ $progress_percent = $total_lessons > 0 ? round(($completed_count / $total_lesson
                     <?php endif; ?>
                 </div>
 
-                <div
-                    style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem;">
-                    <div>
-                        <h1 style="font-size: 1.5rem; font-weight: 800; margin-bottom: 0.5rem;">
+                <div class="lesson-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; gap: 1rem; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 280px;">
+                        <h1 style="font-size: 1.5rem; font-weight: 800; margin-bottom: 0.5rem; line-height: 1.2;">
                             <?php echo e($active_lesson ? $active_lesson['title'] : $course['title']); ?>
                         </h1>
-                        <p style="color: hsl(var(--muted-foreground));">
-                            <?php echo e($course['title']); ?> • บทที่
-                            <?php echo e($active_lesson['order_index'] ?? '-'); ?>
+                        <p style="color: hsl(var(--muted-foreground)); font-size: 0.875rem;">
+                            <?php echo e($course['title']); ?> • บทที่ <?php echo e($active_lesson['order_index'] ?? '-'); ?>
                         </p>
                     </div>
+
 
                     <?php if (is_logged_in()): ?>
                         <?php if ($active_lesson && !in_array($active_lesson['id'], $completed_lessons)): ?>

@@ -11,7 +11,7 @@ if (!$user_id) {
 }
 
 $target_user_id = isset($_GET['user']) ? (int) $_GET['user'] : 0;
-$stmt_users = $pdo->prepare("SELECT id, username, full_name FROM users WHERE id != ?");
+$stmt_users = $pdo->prepare("SELECT id, username, full_name, avatar FROM users WHERE id != ?");
 $stmt_users->execute([$user_id]);
 $users = $stmt_users->fetchAll();
 
@@ -152,6 +152,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $target_user_id > 0) {
             display: flex;
             gap: 1rem;
         }
+
+        .mobile-back-btn {
+            display: none;
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: white;
+            border: 1px solid var(--border-color);
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            text-decoration: none;
+        }
+
+        @media (max-width: 768px) {
+            .chat-layout {
+                grid-template-columns: 1fr;
+                height: calc(100vh - 140px);
+            }
+
+            .chat-sidebar {
+                border-right: none;
+                <?php echo $target_user_id > 0 ? 'display: none;' : 'display: flex;'; ?>
+            }
+
+            .chat-main {
+                <?php echo $target_user_id > 0 ? 'display: flex;' : 'display: none;'; ?>
+            }
+
+            .mobile-back-btn {
+                display: flex;
+            }
+
+            .chat-header {
+                padding: 1rem;
+            }
+
+            .message-area {
+                padding: 1rem;
+            }
+
+            .chat-input-area {
+                padding: 1rem;
+            }
+            .message-bubble {
+                max-width: 85%;
+            }
+        }
     </style>
 </head>
 
@@ -176,8 +224,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $target_user_id > 0) {
                         <?php foreach ($users as $u): ?>
                             <a href="chat.php?user=<?php echo $u['id']; ?>"
                                 class="chat-item <?php echo $target_user_id == $u['id'] ? 'active' : ''; ?>">
-                                <div class="chat-avatar">
-                                    <?php echo strtoupper(substr($u['username'], 0, 1)); ?>
+                                <div class="chat-avatar" <?php if(!empty($u['avatar']) && file_exists('uploads/avatars/'.$u['avatar'])) echo "style=\"background-image: url('uploads/avatars/".htmlspecialchars($u['avatar'])."'); background-size: cover; background-position: center; color: transparent;\""; ?>>
+                                    <?php if(empty($u['avatar']) || !file_exists('uploads/avatars/'.$u['avatar'])) echo mb_strtoupper(mb_substr($u['username'], 0, 1, 'UTF-8'), 'UTF-8'); ?>
                                 </div>
                                 <div style="flex: 1; overflow: hidden;">
                                     <div style="font-weight: 700;">
@@ -200,8 +248,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $target_user_id > 0) {
                         ?>
                         <div class="chat-header">
                             <div style="display: flex; gap: 1rem; align-items: center;">
-                                <div class="chat-avatar" style="width: 32px; height: 32px; font-size: 0.875rem;">
-                                    <?php echo strtoupper(substr($target_user['username'], 0, 1)); ?>
+                                <a href="chat.php" class="mobile-back-btn"><i data-lucide="arrow-left" style="width: 18px;"></i></a>
+                                <div class="chat-avatar" style="width: 32px; height: 32px; font-size: 0.875rem; <?php if(!empty($target_user['avatar']) && file_exists('uploads/avatars/'.$target_user['avatar'])) echo "background-image: url('uploads/avatars/".htmlspecialchars($target_user['avatar'])."'); background-size: cover; background-position: center; color: transparent;"; ?>">
+                                    <?php if(empty($target_user['avatar']) || !file_exists('uploads/avatars/'.$target_user['avatar'])) echo mb_strtoupper(mb_substr($target_user['username'], 0, 1, 'UTF-8'), 'UTF-8'); ?>
                                 </div>
                                 <div style="font-weight: 700;">
                                     <?php echo e($target_user['full_name']); ?>

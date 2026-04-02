@@ -136,7 +136,7 @@ function get_online_members($community_id)
     $pdo = get_pdo();
     if (!$pdo) return [];
     try {
-        $stmt = $pdo->prepare("SELECT u.id, u.username, u.full_name, m.role FROM community_members m JOIN users u ON m.user_id = u.id WHERE m.community_id = ? AND u.last_activity > DATE_SUB(NOW(), INTERVAL 5 MINUTE) ORDER BY u.last_activity DESC LIMIT 10");
+        $stmt = $pdo->prepare("SELECT u.id, u.username, u.full_name, u.avatar, m.role FROM community_members m JOIN users u ON m.user_id = u.id WHERE m.community_id = ? AND u.last_activity > DATE_SUB(NOW(), INTERVAL 5 MINUTE) ORDER BY u.last_activity DESC LIMIT 10");
         $stmt->execute([$community_id]);
         return $stmt->fetchAll();
     } catch (PDOException $e) {

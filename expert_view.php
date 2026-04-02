@@ -146,50 +146,47 @@ $latest_docs = $docs->fetchAll();
             <div class="profile-header-premium">
                 <div class="profile-image-container">
                     <div class="profile-image-large"
-                        style="background-image: url('uploads/avatars/<?php echo $expert['avatar'] ?? 'default.png'; ?>');">
-                        <?php if (!isset($expert['avatar']) || $expert['avatar'] === 'default.png'): ?>
-                            <?php echo strtoupper(substr($expert['username'], 0, 1)); ?>
-                        <?php endif; ?>
+                        style="<?php if(!empty($expert['avatar']) && file_exists('uploads/avatars/'.$expert['avatar'])) echo "background-image: url('uploads/avatars/".htmlspecialchars($expert['avatar'])."'); background-size: cover; background-position: center; color: transparent;"; ?>">
+                        <?php if(empty($expert['avatar']) || !file_exists('uploads/avatars/'.$expert['avatar'])) echo mb_strtoupper(mb_substr($expert['username'], 0, 1, 'UTF-8'), 'UTF-8'); ?>
                     </div>
                 </div>
-                <div style="flex: 1;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        <div>
-                            <h1 style="font-size: 2.5rem; font-weight: 800; margin-bottom: 0.5rem; color: #0f172a;">
-                                <?php echo htmlspecialchars($expert['full_name']); ?>
-                            </h1>
-                            <p style="font-size: 1.125rem; color: var(--teal-primary); font-weight: 700;">
-                                <?php echo htmlspecialchars($expert['specialty'] ?? 'ผู้เชี่ยวชาญทั่วไป'); ?>
-                            </p>
-                        </div>
-                        <div style="text-align: right;">
-                            <div style="font-size: 1.25rem; font-weight: 800; color: var(--teal-primary);">
-                                <?php echo $expert['points']; ?>
-                            </div>
-                            <div
-                                style="font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">
-                                Points Earned</div>
+                <div class="profile-header-info-main">
+                    <div class="profile-info-stack">
+                        <h1 class="profile-fullname">
+                            <?php echo htmlspecialchars($expert['full_name']); ?>
+                        </h1>
+                        <p class="profile-specialty">
+                            <?php echo htmlspecialchars($expert['specialty'] ?? 'ผู้เชี่ยวชาญทั่วไป'); ?>
+                        </p>
+                        <div class="profile-points-status">
+                            <span class="points-number"><?php echo $expert['points']; ?></span>
+                            <span class="points-text">Points Earned</span>
                         </div>
                     </div>
 
                     <div class="expert-stats-pill">
-                        <div class="stat-badge"><i data-lucide="file-text"></i>
-                            <?php echo $expert['doc_count']; ?> Documents
+                        <div class="stat-badge">
+                            <i data-lucide="file-text"></i>
+                            <span><?php echo $expert['doc_count']; ?> Documents</span>
                         </div>
-                        <div class="stat-badge"><i data-lucide="edit"></i>
-                            <?php echo $expert['wiki_count']; ?> Wiki Contributions
+                        <div class="stat-badge">
+                            <i data-lucide="edit-3"></i>
+                            <span><?php echo $expert['wiki_count']; ?> Wiki Contributions</span>
                         </div>
                         <?php if ($expert['phone']): ?>
-                            <div class="stat-badge"><i data-lucide="phone"></i>
-                                <?php echo htmlspecialchars($expert['phone']); ?>
+                            <div class="stat-badge">
+                                <i data-lucide="phone"></i>
+                                <span><?php echo htmlspecialchars($expert['phone']); ?></span>
                             </div>
                         <?php endif; ?>
-                        <div class="stat-badge"><i data-lucide="mail"></i>
-                            <?php echo htmlspecialchars($expert['email']); ?>
+                        <div class="stat-badge">
+                            <i data-lucide="mail"></i>
+                            <span><?php echo htmlspecialchars($expert['email']); ?></span>
                         </div>
                     </div>
                 </div>
             </div>
+
 
             <div class="content-section">
                 <div>
