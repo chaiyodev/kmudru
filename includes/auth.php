@@ -1,23 +1,67 @@
 <?php
-session_start();
+// Secure session cookie settings for mobile compatibility (Safari/ITP)
+if (session_status() === PHP_SESSION_NONE) {
+    $current_protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+
+    if (PHP_VERSION_ID >= 70300) {
+        session_set_cookie_params([
+            'lifetime' => 0,
+            'path' => '/',
+            'domain' => '',
+            'secure' => $current_protocol,
+            'httponly' => true,
+            'samesite' => 'Lax'
+        ]);
+    } else {
+        // Fallback for PHP older than 7.3.0 (No SameSite support via this function)
+        // We use the standard signature to ensure maximum stability and avoid 500 errors.
+        session_set_cookie_params(0, '/', '', $current_protocol, true);
+    }
+    session_start();
+}
 require_once __DIR__ . '/security.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/logger.php';
 
 function login($username, $password)
 {
-    // Basic Brute Force Protection
-    if (isset($_SESSION['login_attempts']) && $_SESSION['login_attempts'] > 5) {
-        if (time() - $_SESSION['last_attempt_time'] < 300) { // 5 mins lockout
-            return "Too many attempts. Please wait.";
-        } else {
-            $_SESSION['login_attempts'] = 0;
-        }
-    }
-
     $pdo = get_pdo();
     if (!$pdo)
         return false;
+
+    // Ensure login_attempts table exists
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS login_attempts (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            ip_address VARCHAR(45) NOT NULL,
+            attempted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_ip_time (ip_address, attempted_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (PDOException $e) {
+        error_log("login_attempts table creation error: " . $e->getMessage());
+    }
+
+    // IP-based Brute Force Protection
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    $lockout_minutes = 5;
+    $max_attempts = 5;
+
+    try {
+        // Clean old attempts (older than lockout period)
+        $pdo->prepare("DELETE FROM login_attempts WHERE attempted_at < DATE_SUB(NOW(), INTERVAL ? MINUTE)")->execute([$lockout_minutes]);
+
+        // Count recent attempts from this IP
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM login_attempts WHERE ip_address = ? AND attempted_at > DATE_SUB(NOW(), INTERVAL ? MINUTE)");
+        $stmt->execute([$ip, $lockout_minutes]);
+        $attempts = $stmt->fetchColumn();
+
+        if ($attempts >= $max_attempts) {
+            return "พยายามเข้าสู่ระบบหลายครั้งเกินไป กรุณารอ {$lockout_minutes} นาทีแล้วลองใหม่ครับ";
+        }
+    } catch (PDOException $e) {
+        error_log("Brute force check error: " . $e->getMessage());
+        // Fallback: allow login attempt if table check fails
+    }
 
     $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ?");
     $stmt->execute([$username]);
@@ -28,13 +72,23 @@ function login($username, $password)
         $_SESSION['username'] = $user['username'];
         $_SESSION['full_name'] = $user['full_name'];
         $_SESSION['role'] = $user['role'];
-        unset($_SESSION['login_attempts']);
+
+        // Clear attempts on successful login
+        try {
+            $pdo->prepare("DELETE FROM login_attempts WHERE ip_address = ?")->execute([$ip]);
+        } catch (PDOException $e) {}
+
         log_activity('login');
         return true;
     }
 
-    $_SESSION['login_attempts'] = ($_SESSION['login_attempts'] ?? 0) + 1;
-    $_SESSION['last_attempt_time'] = time();
+    // Record failed attempt
+    try {
+        $pdo->prepare("INSERT INTO login_attempts (ip_address) VALUES (?)")->execute([$ip]);
+    } catch (PDOException $e) {
+        error_log("Failed to record login attempt: " . $e->getMessage());
+    }
+
     return false;
 }
 
@@ -49,6 +103,32 @@ function require_login()
         header("Location: login.php");
         exit;
     }
+}
+
+/**
+ * Require the logged-in user to have a specific role.
+ * Redirects to index.php with an HTTP 403 status if the role does not match.
+ * Automatically calls require_login() first.
+ *
+ * @param string|array $role  A single role string or an array of allowed roles.
+ */
+function require_role($role)
+{
+    require_login();
+    $allowed = is_array($role) ? $role : [$role];
+    if (!in_array($_SESSION['role'] ?? '', $allowed, true)) {
+        http_response_code(403);
+        header("Location: index.php");
+        exit;
+    }
+}
+
+/**
+ * Shortcut: require the current user to be an admin.
+ */
+function require_admin()
+{
+    require_role('admin');
 }
 
 function logout()
@@ -70,4 +150,34 @@ function get_current_user_data()
         'role' => $_SESSION['role']
     ];
 }
+
+function update_user_activity()
+{
+    if (is_logged_in()) {
+        $pdo = get_pdo();
+        if ($pdo) {
+            try {
+                $stmt = $pdo->prepare("UPDATE users SET last_activity = NOW() WHERE id = ?");
+                $stmt->execute([$_SESSION['user_id']]);
+            } catch (PDOException $e) {
+                // Silently fail if column is missing; avoids 500 error
+            }
+        }
+    }
+}
+
+function get_online_members($community_id)
+{
+    $pdo = get_pdo();
+    if (!$pdo) return [];
+    try {
+        $stmt = $pdo->prepare("SELECT u.id, u.username, u.full_name, u.avatar, m.role FROM community_members m JOIN users u ON m.user_id = u.id WHERE m.community_id = ? AND u.last_activity > DATE_SUB(NOW(), INTERVAL 5 MINUTE) ORDER BY u.last_activity DESC LIMIT 10");
+        $stmt->execute([$community_id]);
+        return $stmt->fetchAll();
+    } catch (PDOException $e) {
+        return [];
+    }
+}
+
+if (is_logged_in()) { update_user_activity(); }
 ?>

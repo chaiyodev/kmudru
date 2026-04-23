@@ -2,6 +2,8 @@
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 
+require_login();
+
 $pdo = get_pdo();
 ?>
 <!DOCTYPE html>
@@ -19,51 +21,68 @@ $pdo = get_pdo();
     <style>
         .hub-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 1.5rem;
-            margin-top: 2rem;
+            margin-top: 2.5rem;
         }
 
         .hub-card {
             background: white;
-            border-radius: 1.5rem;
+            border-radius: 2rem;
             border: 1px solid var(--border-color);
-            padding: 2.5rem;
+            padding: 3rem 2rem;
             text-align: center;
             text-decoration: none;
             color: inherit;
-            transition: var(--transition-base);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             display: flex;
             flex-direction: column;
             align-items: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
         }
 
         .hub-card:hover {
-            transform: translateY(-4px);
-            box-shadow: rgba(245, 159, 10, 0.3) 0px 0px 0px 2px, rgba(20, 29, 31, 0.05) 0px 10px 20px;
+            transform: translateY(-8px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02);
+            border-color: var(--teal-primary);
         }
 
         .hub-icon {
-            width: 64px;
-            height: 64px;
-            border-radius: 20px;
+            width: 72px;
+            height: 72px;
+            border-radius: 22px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 1.5rem;
-            font-size: 1.5rem;
+            margin-bottom: 2rem;
+            font-size: 1.75rem;
+            transition: transform 0.3s ease;
+        }
+
+        .hub-card:hover .hub-icon {
+            transform: scale(1.1) rotate(5deg);
         }
 
         .hub-card h3 {
-            font-size: 1.125rem;
+            font-size: 1.25rem;
             font-weight: 800;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.75rem;
+            color: #0f172a;
         }
 
         .hub-card p {
-            font-size: 0.8125rem;
-            color: hsl(var(--muted-foreground));
-            line-height: 1.5;
+            font-size: 0.875rem;
+            color: #64748b;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 640px) {
+            .hub-grid {
+                grid-template-columns: 1fr;
+            }
+            .hub-card {
+                padding: 2.5rem 1.5rem;
+            }
         }
     </style>
 </head>

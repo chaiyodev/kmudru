@@ -3,10 +3,7 @@ require_once 'includes/db.php';
 require_once 'includes/auth.php';
 
 // Check Admin Access
-if (!is_logged_in() || $_SESSION['role'] !== 'admin') {
-    header("Location: index.php");
-    exit;
-}
+require_admin();
 
 $pdo = get_pdo();
 $message = '';
@@ -14,6 +11,7 @@ $error = '';
 
 // Handle Actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf_token($_POST['csrf_token'] ?? '');
     if (isset($_POST['action'])) {
         if ($_POST['action'] === 'add_user') {
             // Add User Logic
@@ -58,7 +56,7 @@ $users = $pdo->query("SELECT * FROM users ORDER BY created_at DESC")->fetchAll()
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>จัดการสมาชิก | UDRU Wisdom</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo filemtime('assets/css/style.css'); ?>">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
@@ -110,16 +108,29 @@ $users = $pdo->query("SELECT * FROM users ORDER BY created_at DESC")->fetchAll()
             </header>
 
             <?php if ($message): ?>
-                <div
-                    style="background: hsl(142 76% 36% / 0.1); color: hsl(142 76% 36%); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem;">
-                    <?php echo $message; ?>
-                </div>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'ดำเนินการสำเร็จ',
+                            text: '<?php echo addslashes($message); ?>',
+                            confirmButtonColor: 'var(--teal-primary)'
+                        });
+                    });
+                </script>
             <?php endif; ?>
+
             <?php if ($error): ?>
-                <div
-                    style="background: hsl(0 84% 60% / 0.1); color: hsl(0 84% 60%); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem;">
-                    <?php echo $error; ?>
-                </div>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'ขออภัย...',
+                            text: '<?php echo addslashes($error); ?>',
+                            confirmButtonColor: 'var(--teal-primary)'
+                        });
+                    });
+                </script>
             <?php endif; ?>
 
             <div
@@ -142,7 +153,12 @@ $users = $pdo->query("SELECT * FROM users ORDER BY created_at DESC")->fetchAll()
                                     <?php echo $user['id']; ?>
                                 </td>
                                 <td style="padding: 1rem; font-weight: 600;">
-                                    <?php echo htmlspecialchars($user['username']); ?>
+                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                        <div class="avatar-sm" style="width: 24px; height: 24px; font-size: 10px; <?php if(!empty($user['avatar']) && file_exists('uploads/avatars/'.$user['avatar'])) echo "background-image: url('uploads/avatars/".htmlspecialchars($user['avatar'])."'); background-size: cover; background-position: center; color: transparent;"; ?>">
+                                            <?php if(empty($user['avatar']) || !file_exists('uploads/avatars/'.$user['avatar'])) echo mb_strtoupper(mb_substr($user['username'], 0, 1, 'UTF-8'), 'UTF-8'); ?>
+                                        </div>
+                                        <?php echo htmlspecialchars($user['username']); ?>
+                                    </div>
                                 </td>
                                 <td style="padding: 1rem;">
                                     <?php echo htmlspecialchars($user['full_name']); ?>
@@ -170,6 +186,7 @@ $users = $pdo->query("SELECT * FROM users ORDER BY created_at DESC")->fetchAll()
                                     <?php if ($user['id'] != $_SESSION['user_id']): ?>
                                         <form method="POST" onsubmit="return confirm('ยืนยันการลบสมาชิกนี้?');"
                                             style="display: inline;">
+                                            <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                                             <input type="hidden" name="action" value="delete_user">
                                             <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">
                                             <button type="submit" class="btn-icon" style="color: #ef4444;"><i
@@ -193,6 +210,7 @@ $users = $pdo->query("SELECT * FROM users ORDER BY created_at DESC")->fetchAll()
                             style="background: none; border: none; cursor: pointer;"><i data-lucide="x"></i></button>
                     </div>
                     <form method="POST">
+                        <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                         <input type="hidden" name="action" value="add_user">
                         <div class="form-group">
                             <label class="form-label">Username</label>

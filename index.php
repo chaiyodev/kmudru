@@ -5,7 +5,7 @@ require_once 'includes/security.php';
 
 $pdo = get_pdo();
 $user = null;
-if (is_logged_in()) {
+if (is_logged_in() && $pdo) {
     $user_id = $_SESSION['user_id'];
     $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
     $stmt->execute([$user_id]);
@@ -37,33 +37,50 @@ if ($pdo) {
 
         // Fetch latest recommended docs (Content Spotlight - Mixed Types)
         $doc_query = "
-            (SELECT d.id, d.title, d.content, d.type, d.category_id, d.user_id, d.views, d.created_at, d.tags,
-                   c.name as category_name, c.icon as category_icon, 
-                   u.username as author_username, u.full_name as author_full_name,
-                   (SELECT COUNT(*) FROM document_likes WHERE document_id = d.id) as like_count,
-                   (SELECT COUNT(*) FROM comments WHERE document_id = d.id) as comment_count,
-                   'view.php?id=' as base_url
-            FROM documents d 
-            LEFT JOIN categories c ON d.category_id = c.id 
-            LEFT JOIN users u ON d.user_id = u.id 
-            WHERE d.status = 'published')
-            UNION ALL
-            (SELECT t.id, t.title, t.description as content, 'training' as type, t.category_id, NULL as user_id, 0 as views, t.created_at, '' as tags,
-                   c.name as category_name, 'graduation-cap' as category_icon,
-                   'System' as author_username, 'UDRU Training' as author_full_name,
-                   0 as like_count, 0 as comment_count,
-                   'training_view.php?id=' as base_url
-            FROM trainings t
-            LEFT JOIN categories c ON t.category_id = c.id)
+            SELECT * FROM (
+                (SELECT d.id, d.title, d.content, d.type, d.category_id, d.user_id, d.views, d.created_at, d.tags,
+                       c.name as category_name, c.icon as category_icon, 
+                       u.username as author_username, u.full_name as author_full_name, u.avatar as author_avatar,
+                       'view.php?id=' as base_url
+                FROM documents d 
+                LEFT JOIN categories c ON d.category_id = c.id 
+                LEFT JOIN users u ON d.user_id = u.id 
+                WHERE d.status = 'published')
+                UNION ALL
+                (SELECT t.id, t.title, t.description as content, 'training' as type, t.category_id, NULL as user_id, 0 as views, t.created_at, '' as tags,
+                       c.name as category_name, 'graduation-cap' as category_icon,
+                       'System' as author_username, 'UDRU Training' as author_full_name, NULL as author_avatar,
+                       'training_view.php?id=' as base_url
+                FROM trainings t
+                LEFT JOIN categories c ON t.category_id = c.id)
+            ) combined
             ORDER BY created_at DESC 
             LIMIT 6";
         $latest_docs = $pdo->query($doc_query)->fetchAll();
 
+        // Populate counts to avoid N+1 slow queries from correlated subqueries
+        foreach ($latest_docs as &$doc) {
+            $doc['like_count'] = 0;
+            $doc['comment_count'] = 0;
+            if ($doc['type'] !== 'training') {
+                $stmt = $pdo->prepare("SELECT COUNT(*) FROM document_likes WHERE document_id = ?");
+                $stmt->execute([$doc['id']]);
+                $doc['like_count'] = $stmt->fetchColumn();
+
+                $stmt = $pdo->prepare("SELECT COUNT(*) FROM comments WHERE document_id = ?");
+                $stmt->execute([$doc['id']]);
+                $doc['comment_count'] = $stmt->fetchColumn();
+            }
+        }
+        unset($doc); // Unset reference
+
         // Update type labels for display
-        $type_labels['training'] = 'การฝึกอบรม';
-        $type_labels['document'] = 'เอกสาร';
-        $type_labels['wiki'] = 'Wiki';
-        $type_labels['qa'] = 'Q&A';
+        $type_labels = [
+            'document' => 'เอกสาร',
+            'wiki' => 'Wiki',
+            'qa' => 'Q&A',
+            'training' => 'การฝึกอบรม'
+        ];
 
         // Fetch trending topics
         $stmt = $pdo->query("SELECT c.id, c.name, COUNT(d.id) as doc_count FROM categories c LEFT JOIN documents d ON c.id = d.category_id GROUP BY c.id ORDER BY doc_count DESC LIMIT 8");
@@ -77,19 +94,19 @@ if ($pdo) {
             LEFT JOIN categories c ON d.category_id = c.id
             WHERE d.status = 'published'
             ORDER BY d.created_at DESC 
-            LIMIT 8";
+            LIMIT 5";
         $recent_activity = $pdo->query($activity_query)->fetchAll();
 
-        // Fetch personalized AI insight (count of new docs in user's most viewed category)
+        // Fetch personalized AI insight (count of new docs in popular category)
         $ai_insight_count = 0;
         $ai_insight_category = 'ประกันคุณภาพ'; // Default
-        if ($user) {
-            // Find most frequent category in user's history or just most popular one
-            $stmt = $pdo->query("SELECT name FROM categories ORDER BY id ASC LIMIT 1");
-            $ai_insight_category = $stmt->fetchColumn() ?: 'ประกันคุณภาพ';
-
-            $stmt = $pdo->prepare("SELECT COUNT(*) FROM documents WHERE created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)");
-            $stmt->execute();
+        
+        if (!empty($trending_topics)) {
+            // Use the top trending category
+            $top_cat = $trending_topics[0];
+            $ai_insight_category = $top_cat['name'];
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM documents WHERE category_id = ? AND created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)");
+            $stmt->execute([$top_cat['id']]);
             $ai_insight_count = $stmt->fetchColumn();
         } else {
             $stmt = $pdo->query("SELECT COUNT(*) FROM documents WHERE created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)");
@@ -97,244 +114,14 @@ if ($pdo) {
         }
 
     } catch (PDOException $e) {
+        error_log("Index query Error: " . $e->getMessage());
     }
 }
 
-$type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q&A'];
+$page_title = 'UDRU Wisdom | UDRU Knowledge Hub';
+$extra_css = '<link rel="stylesheet" href="assets/css/index.css">';
+require_once 'includes/head.php';
 ?>
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UDRU Wisdom | UDRU Knowledge Hub</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
-        rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        .knowledge-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 1.5rem;
-        }
-
-        .premium-card {
-            background: white;
-            border: 1px solid #eef2f6;
-            border-radius: 1.25rem;
-            padding: 1.5rem;
-            position: relative;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            display: flex;
-            flex-direction: column;
-            cursor: pointer;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-            overflow: hidden;
-        }
-
-        .premium-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.05);
-            border-color: var(--teal-primary);
-        }
-
-        .premium-card.is-recommended {
-            border: 2px solid #fdba74;
-            /* orange-300 */
-        }
-
-        .recommend-badge {
-            position: absolute;
-            top: 0;
-            right: 0;
-            background: #f97316;
-            color: white;
-            padding: 4px 16px;
-            font-size: 0.7rem;
-            font-weight: 800;
-            border-bottom-left-radius: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.025em;
-        }
-
-        .card-top {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 1.25rem;
-        }
-
-        .type-icon-box {
-            width: 36px;
-            height: 36px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #f1f5f9;
-            color: #64748b;
-        }
-
-        .type-tag {
-            padding: 4px 12px;
-            background: #f1f5f9;
-            color: #64748b;
-            border-radius: 100px;
-            font-size: 0.7rem;
-            font-weight: 700;
-            text-transform: uppercase;
-        }
-
-        .card-title {
-            font-size: 1.125rem;
-            font-weight: 800;
-            line-height: 1.4;
-            color: #1e293b;
-            margin-bottom: 0.75rem;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-
-        .card-desc {
-            font-size: 0.875rem;
-            color: #64748b;
-            line-height: 1.6;
-            margin-bottom: 1.25rem;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-
-        .card-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            margin-bottom: 1.5rem;
-            margin-top: auto;
-        }
-
-        .tag-pill {
-            padding: 4px 12px;
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            color: #64748b;
-            border-radius: 100px;
-            font-size: 0.6875rem;
-            font-weight: 600;
-        }
-
-        .card-footer {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding-top: 1rem;
-            border-top: 1px solid #f1f5f9;
-        }
-
-        .footer-author {
-            display: flex;
-            align-items: center;
-            gap: 0.625rem;
-        }
-
-        .author-sm-avatar {
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            background: #f1f5f9;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.6rem;
-            font-weight: 700;
-            color: var(--teal-primary);
-        }
-
-        .author-sm-name {
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: #475569;
-        }
-
-        .footer-stats {
-            display: flex;
-            align-items: center;
-            gap: 0.875rem;
-            color: #94a3b8;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        .stat-item-sm {
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-        }
-
-        @media (max-width: 768px) {
-            .knowledge-grid {
-                grid-template-columns: 1fr !important;
-                gap: 1rem !important;
-            }
-
-            .premium-card {
-                padding: 1.25rem;
-            }
-
-            .grid-stats {
-                grid-template-columns: repeat(2, 1fr) !important;
-                gap: 1rem !important;
-            }
-
-            .hero-centered {
-                padding: 2.5rem 1rem 3.5rem !important;
-            }
-
-            .hero-centered h1 {
-                font-size: 1.75rem !important;
-            }
-
-            .main-viewport {
-                padding: 1.25rem !important;
-            }
-
-            .main-content-grid {
-                grid-template-columns: 1fr !important;
-                gap: 1.5rem !important;
-            }
-
-            .ai-smart-card {
-                padding: 1.25rem !important;
-            }
-
-            .ai-smart-card h4 {
-                font-size: 0.95rem !important;
-            }
-
-            .ai-smart-card p {
-                font-size: 0.75rem !important;
-                line-height: 1.4 !important;
-            }
-
-            /* Fix tag-badge wrapping */
-            .tag-badge {
-                max-width: 100%;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-                display: inline-block;
-            }
-        }
-    </style>
-</head>
-
-<body>
     <div class="app-container">
         <!-- Standardized Sidebar -->
         <?php include 'includes/sidebar.php'; ?>
@@ -357,27 +144,49 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                     <p>สืบค้นและแบ่งปันองค์ความรู้เพื่อสังคมแห่งการเรียนรู้ UDRU</p>
                 </div>
                 <div class="header-actions">
-                    <a href="create.php" class="btn-primary"><i data-lucide="plus"></i>สร้างองค์ความรู้</a>
+                    <a href="<?php echo is_logged_in() ? 'create.php' : 'javascript:void(0)'; ?>" 
+                       onclick="<?php echo is_logged_in() ? '' : "return requireLoginPrompt('สร้างองค์ความรู้')"; ?>" 
+                       class="btn-primary"><i data-lucide="plus"></i>สร้างองค์ความรู้</a>
                 </div>
             </header>
 
-            <!-- Hero Section -->
-            <section class="hero-centered animate-slide-down">
-                <h1>สืบค้นองค์ความรู้ของมหาวิทยาลัย</h1>
-                <p>แหล่งรวบรวมเทคนิค วิจัย และแนวทางการทำงานที่ดีที่สุดของบุคลากร UDRU</p>
+            <!-- Premium Hero Section -->
+            <section class="hero-premium animate-fade-in">
+                <div class="hero-mask"></div>
+                <div class="hero-content">
+                    <span class="hero-tag">มหาวิทยาลัยราชภัฏอุดรธานี</span>
+                    <h1>ขุมปัญญาอัจฉริยะ <span>UDRU Wisdom</span></h1>
+                    <p>ศูนย์กลางการรวบรวมเทคนิค วิจัย และแนวทางการทำงานที่ดีที่สุด เพื่อสร้างสังคมแห่งการเรียนรู้ที่ยั่งยืน</p>
 
-                <div class="search-container-center">
-                    <form action="ai_assistant.php" method="GET" class="search-inner" id="main-search-form">
-                        <i data-lucide="search" id="search-icon" style="color: hsl(var(--muted-foreground));"></i>
-                        <input type="text" name="q" id="search-input" placeholder="พิมพ์สิ่งที่คุณต้องการค้นหา..."
-                            autofocus>
-                        <button type="button" onclick="toggleAI()" id="ai-toggle-btn" class="ai-badge"
-                            style="cursor: pointer; border: none; background: #f1f5f9; color: #64748b; font-size: 0.65rem; padding: 4px 8px; border-radius: 6px;">
-                            <i data-lucide="sparkles" style="width: 12px; height: 12px; margin-right: 4px;"></i> AI
-                            Mode: OFF
-                        </button>
-                        <button type="submit" class="btn-search-main">สืบค้น</button>
+                    <form action="browse.php" method="GET" class="hero-search-box">
+                        <div class="search-input-group">
+                            <i data-lucide="search" class="search-lead-icon"></i>
+                            <input type="text" name="q" placeholder="ค้นหาบทความ, งานวิจัย หรือชุดความรู้..." autocomplete="off">
+                            <button type="submit" class="hero-search-btn">
+                                <span>ค้นหาข้อมูล</span>
+                                <i data-lucide="arrow-right"></i>
+                            </button>
+                        </div>
+                        <div class="hero-quick-tags">
+                            <span>ยอดนิยม:</span>
+                            <a href="browse.php?q=AI">#AI</a>
+                            <a href="browse.php?q=วิจัย">#วิจัย</a>
+                            <a href="browse.php?q=KM">#KM</a>
+                        </div>
                     </form>
+                </div>
+                <div class="hero-visual" id="heroVisual">
+                    <div class="v-blob v-1"></div>
+                    <div class="v-blob v-2"></div>
+                    
+                    <!-- Premium Wisdom Aura -->
+                    <div class="hero-feather-wrapper" id="featherParallax">
+                        <div class="feather-glow"></div>
+                        <div class="wisdom-sparkle sparkle-1"></div>
+                        <div class="wisdom-sparkle sparkle-2"></div>
+                        <div class="wisdom-sparkle sparkle-3"></div>
+                        <div class="wisdom-sparkle sparkle-4"></div>
+                    </div>
                 </div>
             </section>
 
@@ -466,6 +275,21 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                                     </div>
                                     <span class="type-tag"><?php echo $type_labels[$doc['type']] ?? 'เนื้อหา'; ?></span>
                                 </div>
+                                
+                                <?php 
+                                $cover_image = null;
+                                if (preg_match('/<img[^>]+src="([^">]+)"/i', $doc['content'], $matches)) {
+                                    $cover_image = $matches[1];
+                                } elseif (preg_match('/!\[.*?\]\((.*?)\)/i', $doc['content'], $matches)) {
+                                    $cover_image = $matches[1];
+                                }
+                                ?>
+                                <?php if ($cover_image): ?>
+                                    <div style="width: calc(100% + 40px); height: 180px; margin: 1rem -20px 1.5rem -20px; border-radius: 8px; overflow: hidden; position: relative;">
+                                        <div style="position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.03);"></div>
+                                        <img src="<?php echo htmlspecialchars($cover_image); ?>" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;" loading="lazy">
+                                    </div>
+                                <?php endif; ?>
 
                                 <h3 class="card-title"><?php echo e($doc['title']); ?></h3>
                                 <p class="card-desc">
@@ -485,8 +309,8 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
 
                                 <div class="card-footer">
                                     <div class="footer-author">
-                                        <div class="author-sm-avatar">
-                                            <?php echo strtoupper(substr($doc['author_username'] ?? 'U', 0, 1)); ?>
+                                        <div class="author-sm-avatar" <?php if(!empty($doc['author_avatar']) && file_exists('uploads/avatars/' . $doc['author_avatar'])) echo 'style="background-image: url(\'uploads/avatars/' . htmlspecialchars($doc['author_avatar']) . '\'); background-size: cover; background-position: center; color: transparent; border: 1px solid var(--border-color);"'; ?>>
+                                            <?php if(empty($doc['author_avatar']) || !file_exists('uploads/avatars/' . $doc['author_avatar'])) echo htmlspecialchars(mb_strtoupper(mb_substr($doc['author_username'] ?? 'U', 0, 1, 'UTF-8'), 'UTF-8')); ?>
                                         </div>
                                         <span
                                             class="author-sm-name"><?php echo e($doc['author_full_name'] ?? $doc['author_username'] ?? 'Anonymous'); ?></span>
@@ -512,7 +336,7 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                     </div>
                 </section>
 
-                <aside>
+                <aside style="display: flex; flex-direction: column; position: sticky; top: 2rem; align-self: start;">
                     <!-- AI Smart Hub Widget -->
                     <div class="ai-smart-card"
                         style="background: linear-gradient(135deg, #14b8a6 0%, #0ea5e9 100%); padding: 1.5rem; border-radius: 1rem; color: white; margin-bottom: 2rem; position: relative; overflow: hidden; box-shadow: 0 10px 25px rgba(20, 184, 166, 0.3);">
@@ -524,7 +348,7 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                         </h4>
                         <p style="font-size: 0.8rem; opacity: 0.9; line-height: 1.5;">
                             วันนี้มีเนื้อหาใหม่ <?php echo $ai_insight_count; ?> รายการในหัวข้อ
-                            "<?php echo $ai_insight_category; ?>" ที่คุณอาจสนใจครับ
+                            "<?php echo htmlspecialchars($ai_insight_category); ?>" ที่คุณอาจสนใจครับ
                         </p>
                         <a href="ai_assistant.php"
                             style="display: block; width: 100%; padding: 0.65rem; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 10px; color: white; text-align: center; text-decoration: none; margin-top: 1rem; font-size: 0.8125rem; font-weight: 700;">ดูข้อมูลเจาะลึก</a>
@@ -581,9 +405,10 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
         </main>
     </div>
 
+<?php 
+$extra_js = <<<'HTML'
     <script>
-        lucide.createIcons();
-
+        // AI Toggle Logic
         let aiMode = false;
         function toggleAI() {
             aiMode = !aiMode;
@@ -609,7 +434,31 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
             }
             lucide.createIcons();
         }
-    </script>
-</body>
 
-</html>
+        // Premium Feather Parallax Logic
+        const hero = document.querySelector('.hero-premium');
+        const feather = document.getElementById('featherParallax');
+        
+        if (hero && feather) {
+            hero.addEventListener('mousemove', (e) => {
+                const rect = hero.getBoundingClientRect();
+                const x = ((e.clientX - rect.left) / rect.width) - 0.5;
+                const y = ((e.clientY - rect.top) / rect.height) - 0.5;
+                
+                requestAnimationFrame(() => {
+                    // Subtle movement and rotation based on mouse position
+                    feather.style.transform = `translate(${x * 40}px, ${y * 40}px) rotate(${x * 10}deg)`;
+                });
+            });
+            
+            // Return to center when mouse leaves
+            hero.addEventListener('mouseleave', () => {
+                requestAnimationFrame(() => {
+                    feather.style.transform = `translate(0, 0) rotate(0deg)`;
+                });
+            });
+        }
+    </script>
+HTML;
+require_once 'includes/footer.php';
+?>

@@ -2,6 +2,8 @@
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 
+require_login();
+
 $pdo = get_pdo();
 $categories = [];
 if ($pdo) {
@@ -12,13 +14,19 @@ $message = '';
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
-    $title = $_POST['title'];
-    $category_id = $_POST['category_id'];
-    $description = $_POST['description'];
-    $tags = $_POST['tags'];
+    verify_csrf_token($_POST['csrf_token'] ?? '');
+    $title = trim($_POST['title'] ?? '');
+    $category_id = (int)($_POST['category_id'] ?? 0);
+    $description = trim($_POST['description'] ?? '');
+    $tags = trim($_POST['tags'] ?? '');
     $user_id = $_SESSION['user_id'];
 
-    if (isset($_FILES['file']) && $_FILES['file']['error'] === 0) {
+    $has_file = isset($_FILES['file']) && $_FILES['file']['error'] === 0;
+    
+    if (empty($title)) {
+        $error = "กรุณากรอกชื่อเอกสาร";
+    } else if ($has_file) {
+        // File was uploaded - validate and save
         $upload_dir = 'uploads/';
         if (!is_dir($upload_dir))
             mkdir($upload_dir, 0777, true);
@@ -26,12 +34,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
         $file_name = time() . '_' . basename($_FILES['file']['name']);
         $target_file = $upload_dir . $file_name;
 
-        if (move_uploaded_file($_FILES['file']['tmp_name'], $target_file)) {
+        // Strict file type validation
+        $allowed_extensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png'];
+        $file_ext = strtolower(pathinfo($_FILES['file']['name'], PATHINFO_EXTENSION));
+
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime_type = finfo_file($finfo, $_FILES['file']['tmp_name']);
+        finfo_close($finfo);
+
+        $allowed_mime_types = [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-powerpoint',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'image/jpeg',
+            'image/png'
+        ];
+
+        $max_file_size = 50 * 1024 * 1024; // 50 MB
+
+        if ($_FILES['file']['size'] > $max_file_size) {
+            $error = "ขนาดไฟล์เกินที่กำหนดไว้ (สูงสุด 50MB)";
+        } else if (!in_array($file_ext, $allowed_extensions) || !in_array($mime_type, $allowed_mime_types)) {
+            $error = "ไฟล์ที่อัปโหลดไม่ได้รับอนุญาตให้ใช้งาน (รองรับเฉพาะ PDF, Word, Excel, PPT, JPG, PNG)";
+        } else if (move_uploaded_file($_FILES['file']['tmp_name'], $target_file)) {
             try {
                 $pdo->beginTransaction();
 
                 // Insert Document
-                $stmt = $pdo->prepare("INSERT INTO documents (title, content, category_id, user_id, type, tags) VALUES (?, ?, ?, ?, 'document', ?)");
+                $stmt = $pdo->prepare("INSERT INTO documents (title, content, category_id, user_id, type, tags, status) VALUES (?, ?, ?, ?, 'document', ?, 'published')");
                 $stmt->execute([$title, $description, $category_id, $user_id, $tags]);
                 $doc_id = $pdo->lastInsertId();
 
@@ -40,6 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
                 $stmt->execute([$doc_id, $_FILES['file']['name'], $target_file, $_FILES['file']['type'], $_FILES['file']['size']]);
 
                 $pdo->commit();
+                log_activity('document_upload', 'document', "Title: $title | File: " . $_FILES['file']['name']);
                 $message = "อัปโหลดเอกสารเรียบร้อยแล้ว!";
             } catch (Exception $e) {
                 $pdo->rollBack();
@@ -49,108 +84,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
             $error = "ไม่สามารถย้ายไฟล์ที่อัปโหลดได้";
         }
     } else {
-        $error = "กรุณาเลือกไฟล์ที่ต้องการอัปโหลด";
+        // No file uploaded - create document with description only
+        try {
+            $stmt = $pdo->prepare("INSERT INTO documents (title, content, category_id, user_id, type, tags, status) VALUES (?, ?, ?, ?, 'document', ?, 'published')");
+            $stmt->execute([$title, $description, $category_id, $user_id, $tags]);
+            log_activity('document_create', 'document', "Title: $title");
+            $message = "สร้างเอกสารเรียบร้อยแล้ว!";
+        } catch (Exception $e) {
+            $error = "เกิดข้อผิดพลาด: " . $e->getMessage();
+        }
     }
 }
 ?>
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>อัปโหลดเอกสาร | UDRU Wisdom</title>
-    <link rel="stylesheet" href="assets/css/style.css">
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
-        rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        .upload-zone {
-            border: 2px dashed var(--border-color);
-            border-radius: 1rem;
-            padding: 3rem;
-            text-align: center;
-            background: hsl(var(--muted) / 0.5);
-            transition: var(--transition-base);
-            cursor: pointer;
-            margin-bottom: 2rem;
-        }
-
-        .upload-zone:hover,
-        .upload-zone.drag-active {
-            border-color: var(--teal-primary);
-            background: hsl(var(--primary) / 0.05);
-        }
-
-        .upload-icon {
-            width: 48px;
-            height: 48px;
-            color: var(--teal-primary);
-            margin: 0 auto 1rem;
-        }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .form-label {
-            display: block;
-            font-size: 0.875rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            color: hsl(var(--foreground));
-        }
-
-        .form-input,
-        .form-select,
-        .form-textarea {
-            width: 100%;
-            padding: 0.75rem 1rem;
-            border-radius: 0.5rem;
-            border: 1px solid var(--border-color);
-            font-family: inherit;
-            font-size: 0.875rem;
-            outline: none;
-            transition: var(--transition-base);
-        }
-
-        .form-input:focus,
-        .form-select:focus,
-        .form-textarea:focus {
-            border-color: var(--teal-primary);
-            box-shadow: 0 0 0 2px hsl(var(--primary) / 0.1);
-        }
-
-        .form-textarea {
-            min-height: 120px;
-            resize: vertical;
-        }
-
-        .info-card {
-            background: white;
-            border-radius: 0.75rem;
-            border: 1px solid var(--border-color);
-            padding: 1.5rem;
-        }
-
-        .info-item {
-            display: flex;
-            gap: 0.75rem;
-            margin-bottom: 1rem;
-            font-size: 0.8125rem;
-            color: hsl(var(--muted-foreground));
-        }
-
-        .info-item i {
-            color: var(--teal-primary);
-            flex-shrink: 0;
-            margin-top: 2px;
-        }
-    </style>
-</head>
-
-<body>
+<?php
+$page_title = 'อัปโหลดเอกสาร | UDRU Wisdom';
+$extra_css = '<link rel="stylesheet" href="assets/css/upload.css">';
+require_once 'includes/head.php';
+?>
     <div class="app-container">
         <?php include 'includes/sidebar.php'; ?>
 
@@ -164,26 +114,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
             </header>
 
             <?php if ($message): ?>
-                <div
-                    style="background: hsl(142 76% 36% / 0.1); color: hsl(142 76% 36%); padding: 1rem; border-radius: 0.5rem; margin-bottom: 2rem; border: 1px solid hsl(142 76% 36% / 0.2);">
-                    <?php echo $message; ?>
-                </div>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'สำเร็จ!',
+                            text: '<?php echo addslashes($message); ?>',
+                            confirmButtonColor: 'var(--teal-primary)'
+                        }).then(() => {
+                            window.location.href = 'browse.php';
+                        });
+                    });
+                </script>
             <?php endif; ?>
 
             <?php if ($error): ?>
-                <div
-                    style="background: hsl(0 84% 60% / 0.1); color: hsl(0 84% 60%); padding: 1rem; border-radius: 0.5rem; margin-bottom: 2rem; border: 1px solid hsl(0 84% 60% / 0.2);">
-                    <?php echo $error; ?>
-                </div>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'ขออภัย...',
+                            text: '<?php echo addslashes($error); ?>',
+                            confirmButtonColor: 'var(--teal-primary)'
+                        });
+                    });
+                </script>
             <?php endif; ?>
 
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2.5rem;">
+            <div class="upload-grid">
                 <form action="upload.php" method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                     <div id="drop-zone" class="upload-zone">
                         <div class="upload-icon"><i data-lucide="upload-cloud"></i></div>
                         <h3 style="font-weight: 700; margin-bottom: 0.5rem;">คลิกเพื่อเลือกไฟล์ หรือลากมาวางที่นี่</h3>
                         <p style="font-size: 0.8125rem; color: hsl(var(--muted-foreground));">รองรับไฟล์ PDF, Word,
-                            Excel, PPT และไฟล์รูปภาพ (สูงสุด 20MB)</p>
+                            Excel, PPT และไฟล์รูปภาพ (สูงสุด 50MB)</p>
                         <input type="file" name="file" id="file-input" style="display: none;">
                     </div>
 
@@ -219,7 +184,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
                                 placeholder="เช่น คู่มือ, IT, วิจัย (คั่นด้วยคอมม่า)">
                         </div>
 
-                        <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+                        <div class="form-actions">
                             <button type="submit" class="btn-primary"
                                 style="flex: 1; justify-content: center;">ยืนยันการอัปโหลด</button>
                             <a href="index.php" class="btn-primary"
@@ -264,39 +229,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
         </main>
     </div>
 
+<?php
+$extra_js = <<<'HTML'
     <script>
-        lucide.createIcons();
-
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
 
-        dropZone.addEventListener('click', () => fileInput.click());
+        if (dropZone && fileInput) {
+            dropZone.addEventListener('click', () => fileInput.click());
 
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.classList.add('drag-active');
-        });
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('drag-active');
+            });
 
-        ['dragleave', 'drop'].forEach(event => {
-            dropZone.addEventListener(event, () => dropZone.classList.remove('drag-active'));
-        });
+            ['dragleave', 'drop'].forEach(event => {
+                dropZone.addEventListener(event, () => dropZone.classList.remove('drag-active'));
+            });
 
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            fileInput.files = e.dataTransfer.files;
-            handleFileSelect();
-        });
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                fileInput.files = e.dataTransfer.files;
+                handleFileSelect();
+            });
 
-        fileInput.addEventListener('change', handleFileSelect);
+            fileInput.addEventListener('change', handleFileSelect);
 
-        function handleFileSelect() {
-            if (fileInput.files.length > 0) {
-                const fileName = fileInput.files[0].name;
-                dropZone.querySelector('h3').textContent = 'เลือกไฟล์แล้ว: ' + fileName;
-                dropZone.querySelector('p').textContent = 'คลิกเพื่อเปลี่ยนไฟล์';
+            function handleFileSelect() {
+                if (fileInput.files.length > 0) {
+                    const fileName = fileInput.files[0].name;
+                    dropZone.querySelector('h3').textContent = 'เลือกไฟล์แล้ว: ' + fileName;
+                    dropZone.querySelector('p').textContent = 'คลิกเพื่อเปลี่ยนไฟล์';
+                }
             }
         }
     </script>
-</body>
-
-</html>
+HTML;
+require_once 'includes/footer.php';
+?>

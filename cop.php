@@ -28,104 +28,12 @@ if ($pdo) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ชุมชน CoP | UDRU Wisdom</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo filemtime('assets/css/style.css'); ?>">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/cop.css">
     <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        .cop-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-            gap: 2rem;
-        }
-
-        .cop-card {
-            background: white;
-            border-radius: 1.25rem;
-            border: 1px solid var(--border-color);
-            overflow: hidden;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            cursor: pointer;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-        }
-
-        .cop-card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);
-            border-color: var(--teal-primary);
-        }
-
-        .cop-card-banner {
-            height: 140px;
-            position: relative;
-            background: #14b8a6;
-            overflow: hidden;
-        }
-
-        .cop-card-avatar {
-            width: 70px;
-            height: 70px;
-            border-radius: 1.25rem;
-            background: white;
-            border: 4px solid white;
-            position: absolute;
-            left: 1.5rem;
-            bottom: -35px;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2rem;
-            z-index: 2;
-        }
-
-        .cop-status-tag {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            padding: 4px 10px;
-            border-radius: 100px;
-            background: rgba(255, 255, 255, 0.2);
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: white;
-            font-size: 0.65rem;
-            font-weight: 700;
-            text-transform: uppercase;
-        }
-
-        .category-tag {
-            padding: 4px 10px;
-            border-radius: 6px;
-            background: #f1f5f9;
-            color: #64748b;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        .btn-join {
-            width: 100%;
-            padding: 0.75rem;
-            border-radius: 0.75rem;
-            border: none;
-            font-weight: 700;
-            background: #f1f5f9;
-            color: #475569;
-            transition: 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-
-        .cop-card:hover .btn-join {
-            background: var(--teal-primary);
-            color: white;
-        }
-    </style>
 </head>
 
 <body>
@@ -139,7 +47,9 @@ if ($pdo) {
                     <p>เครือข่ายความร่วมมือของบุคลากร UDRU เพื่อความเป็นเลิศทางวิชาการและการจัดการ</p>
                 </div>
                 <div class="header-actions">
-                    <a href="cop_create.php" class="btn-primary"
+                    <a href="<?php echo is_logged_in() ? 'cop_create.php' : 'javascript:void(0)'; ?>" 
+                       onclick="<?php echo is_logged_in() ? '' : "return requireLoginPrompt('สร้างชุมชนใหม่')"; ?>" 
+                       class="btn-primary"
                         style="background: #8b5cf6; box-shadow: 0 4px 14px 0 rgba(139, 92, 246, 0.39);">
                         <i data-lucide="plus-circle"></i> สร้างชุมชนใหม่
                     </a>
@@ -148,6 +58,7 @@ if ($pdo) {
 
             <!-- Stats Bar -->
             <div class="grid-stats" style="margin-bottom: 3rem;">
+
                 <div class="card-stat">
                     <div class="stat-header">
                         <div class="stat-icon" style="background: #f5f3ff; color: #8b5cf6;"><i data-lucide="layers"></i>
@@ -213,16 +124,13 @@ if ($pdo) {
                                     สมาชิก
                                 </div>
                                 <div style="display: flex; -webkit-rtl-ordering: visual; direction: rtl;">
-                                    <!-- Simple Avatar Stack Mockup -->
-                                    <div
-                                        style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; background: #e2e8f0; margin-left: -8px;">
-                                    </div>
-                                    <div
-                                        style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; background: #cbd5e1; margin-left: -8px;">
-                                    </div>
-                                    <div
-                                        style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; background: #94a3b8; margin-left: -8px;">
-                                    </div>
+                                    <?php
+                                    $stmt_m = $pdo->prepare("SELECT u.avatar FROM community_members m JOIN users u ON m.user_id = u.id WHERE community_id = ? LIMIT 3");
+                                    $stmt_m->execute([$cop['id']]);
+                                    $top_members = $stmt_m->fetchAll();
+                                    foreach($top_members as $tm): ?>
+                                        <div style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; background: #e2e8f0; margin-left: -8px; background-image: url('uploads/avatars/<?php echo $tm['avatar'] ?: 'default.png'; ?>'); background-size: cover; background-position: center;"></div>
+                                    <?php endforeach; ?>
                                 </div>
                             </div>
 

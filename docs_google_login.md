@@ -8,6 +8,10 @@
 ### 🛠️ สิ่งที่ต้องเตรียม
 1. บัญชี Google (แนะนำให้ใช้ @udru.ac.th เพื่อความเป็นทางการ)
 2. เข้าใช้งาน [Google Cloud Console](https://console.cloud.google.com/)
+3. **สำคัญมาก**: ตรวจสอบว่าตาราง `users` ในฐานข้อมูลของคุณมีคอลัมน์ `google_id` รองรับอยู่แล้ว หากยังไม่มี ให้รัน SQL ด้านล่างนี้ใน phpMyAdmin:
+   ```sql
+   ALTER TABLE users ADD COLUMN google_id VARCHAR(255) DEFAULT NULL AFTER role;
+   ```
 
 ---
 

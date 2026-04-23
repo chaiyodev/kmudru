@@ -20,6 +20,7 @@ $show_quiz = true;
 $result_mode = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf_token($_POST['csrf_token'] ?? '');
     // Process Submission
     $score = 0;
     $total = 0;
@@ -142,6 +143,7 @@ if (count($quiz_questions) == 0)
             </div>
 
             <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                 <?php foreach ($quiz_questions as $index => $q):
                     $opts = json_decode($q['options'], true);
                     ?>

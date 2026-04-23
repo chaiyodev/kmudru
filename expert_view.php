@@ -33,6 +33,7 @@ $error = '';
 
 // Handle Updates
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_edit) {
+    verify_csrf_token($_POST['csrf_token'] ?? '');
     $full_name = trim($_POST['full_name']);
     $specialty = trim($_POST['specialty']);
     $bio = trim($_POST['bio']);
@@ -86,129 +87,12 @@ $latest_docs = $docs->fetchAll();
     <title>
         <?php echo htmlspecialchars($expert['full_name']); ?> | UDRU Wisdom
     </title>
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo filemtime('assets/css/style.css'); ?>">
     <link
         href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/expert.css">
     <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        .profile-header-premium {
-            background: white;
-            border-radius: 24px;
-            padding: 3rem;
-            display: flex;
-            gap: 3rem;
-            align-items: center;
-            border: 1px solid var(--border-color);
-            margin-bottom: 2rem;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
-        }
-
-        .profile-image-container {
-            position: relative;
-            flex-shrink: 0;
-        }
-
-        .profile-image-large {
-            width: 180px;
-            height: 180px;
-            border-radius: 40px;
-            background: var(--teal-primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 4rem;
-            font-weight: 800;
-            background-size: cover;
-            background-position: center;
-            border: 4px solid white;
-            box-shadow: 0 10px 30px rgba(20, 184, 166, 0.2);
-        }
-
-        .expert-stats-pill {
-            display: flex;
-            gap: 1rem;
-            margin-top: 1.5rem;
-        }
-
-        .stat-badge {
-            padding: 0.5rem 1rem;
-            background: #f1f5f9;
-            border-radius: 100px;
-            font-size: 0.8125rem;
-            font-weight: 600;
-            color: #475569;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .content-section {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 2rem;
-        }
-
-        .info-card {
-            background: white;
-            padding: 2rem;
-            border-radius: 20px;
-            border: 1px solid var(--border-color);
-            margin-bottom: 2rem;
-        }
-
-        .info-label {
-            font-size: 0.75rem;
-            font-weight: 800;
-            color: var(--teal-primary);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 0.75rem;
-            display: block;
-        }
-
-        .edit-overlay {
-            position: absolute;
-            bottom: -10px;
-            right: -10px;
-            background: white;
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-            border: 1px solid var(--border-color);
-            color: var(--teal-primary);
-        }
-
-        .modal-edit {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal-content {
-            background: white;
-            width: 90%;
-            max-width: 600px;
-            padding: 2.5rem;
-            border-radius: 24px;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-    </style>
 </head>
 
 <body>
@@ -234,59 +118,75 @@ $latest_docs = $docs->fetchAll();
             </header>
 
             <?php if ($message): ?>
-                <div
-                    style="background: #10b98110; color: #10b981; padding: 1rem 1.5rem; border-radius: 12px; margin-bottom: 2rem; border: 1px solid #10b98120;">
-                    <?php echo $message; ?>
-                </div>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'อัปเดตสำเร็จ!',
+                            text: '<?php echo addslashes($message); ?>',
+                            confirmButtonColor: 'var(--teal-primary)'
+                        });
+                    });
+                </script>
+            <?php endif; ?>
+
+            <?php if ($error): ?>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'เกิดข้อผิดพลาด',
+                            text: '<?php echo addslashes($error); ?>',
+                            confirmButtonColor: 'var(--teal-primary)'
+                        });
+                    });
+                </script>
             <?php endif; ?>
 
             <div class="profile-header-premium">
                 <div class="profile-image-container">
                     <div class="profile-image-large"
-                        style="background-image: url('uploads/avatars/<?php echo $expert['avatar'] ?? 'default.png'; ?>');">
-                        <?php if (!isset($expert['avatar']) || $expert['avatar'] === 'default.png'): ?>
-                            <?php echo strtoupper(substr($expert['username'], 0, 1)); ?>
-                        <?php endif; ?>
+                        style="<?php if(!empty($expert['avatar']) && file_exists('uploads/avatars/'.$expert['avatar'])) echo "background-image: url('uploads/avatars/".htmlspecialchars($expert['avatar'])."'); background-size: cover; background-position: center; color: transparent;"; ?>">
+                        <?php if(empty($expert['avatar']) || !file_exists('uploads/avatars/'.$expert['avatar'])) echo mb_strtoupper(mb_substr($expert['username'], 0, 1, 'UTF-8'), 'UTF-8'); ?>
                     </div>
                 </div>
-                <div style="flex: 1;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        <div>
-                            <h1 style="font-size: 2.5rem; font-weight: 800; margin-bottom: 0.5rem; color: #0f172a;">
-                                <?php echo htmlspecialchars($expert['full_name']); ?>
-                            </h1>
-                            <p style="font-size: 1.125rem; color: var(--teal-primary); font-weight: 700;">
-                                <?php echo htmlspecialchars($expert['specialty'] ?? 'ผู้เชี่ยวชาญทั่วไป'); ?>
-                            </p>
-                        </div>
-                        <div style="text-align: right;">
-                            <div style="font-size: 1.25rem; font-weight: 800; color: var(--teal-primary);">
-                                <?php echo $expert['points']; ?>
-                            </div>
-                            <div
-                                style="font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">
-                                Points Earned</div>
+                <div class="profile-header-info-main">
+                    <div class="profile-info-stack">
+                        <h1 class="profile-fullname">
+                            <?php echo htmlspecialchars($expert['full_name']); ?>
+                        </h1>
+                        <p class="profile-specialty">
+                            <?php echo htmlspecialchars($expert['specialty'] ?? 'ผู้เชี่ยวชาญทั่วไป'); ?>
+                        </p>
+                        <div class="profile-points-status">
+                            <span class="points-number"><?php echo $expert['points']; ?></span>
+                            <span class="points-text">Points Earned</span>
                         </div>
                     </div>
 
                     <div class="expert-stats-pill">
-                        <div class="stat-badge"><i data-lucide="file-text"></i>
-                            <?php echo $expert['doc_count']; ?> Documents
+                        <div class="stat-badge">
+                            <i data-lucide="file-text"></i>
+                            <span><?php echo $expert['doc_count']; ?> Documents</span>
                         </div>
-                        <div class="stat-badge"><i data-lucide="edit"></i>
-                            <?php echo $expert['wiki_count']; ?> Wiki Contributions
+                        <div class="stat-badge">
+                            <i data-lucide="edit-3"></i>
+                            <span><?php echo $expert['wiki_count']; ?> Wiki Contributions</span>
                         </div>
                         <?php if ($expert['phone']): ?>
-                            <div class="stat-badge"><i data-lucide="phone"></i>
-                                <?php echo htmlspecialchars($expert['phone']); ?>
+                            <div class="stat-badge">
+                                <i data-lucide="phone"></i>
+                                <span><?php echo htmlspecialchars($expert['phone']); ?></span>
                             </div>
                         <?php endif; ?>
-                        <div class="stat-badge"><i data-lucide="mail"></i>
-                            <?php echo htmlspecialchars($expert['email']); ?>
+                        <div class="stat-badge">
+                            <i data-lucide="mail"></i>
+                            <span><?php echo htmlspecialchars($expert['email']); ?></span>
                         </div>
                     </div>
                 </div>
             </div>
+
 
             <div class="content-section">
                 <div>
@@ -338,6 +238,7 @@ $latest_docs = $docs->fetchAll();
                 </div>
 
                 <form action="expert_view.php?id=<?php echo $expert_id; ?>" method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                     <div class="form-group" style="margin-bottom: 1.5rem;">
                         <label class="form-label">รูปประจำตัว</label>
                         <input type="file" name="avatar" class="form-input">

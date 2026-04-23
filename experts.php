@@ -37,7 +37,7 @@ if ($pdo) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>รายชื่อผู้เชี่ยวชาญ | UDRU Wisdom</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo filemtime('assets/css/style.css'); ?>">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
@@ -54,11 +54,19 @@ if ($pdo) {
                     <h2>ทำความรู้จักผู้เชี่ยวชาญ UDRU</h2>
                     <p>รวบรวมบุคลากรที่มีความรู้ความสามารถโดดเด่นในแต่ละสาขา</p>
                 </div>
+                <div class="header-actions">
+                    <a href="<?php echo is_logged_in() ? 'experts_create.php' : 'javascript:void(0)'; ?>" 
+                       onclick="<?php echo is_logged_in() ? '' : "return requireLoginPrompt('ลงทะเบียนเป็นผู้เชี่ยวชาญ')"; ?>" 
+                       class="btn-primary">
+                        <i data-lucide="user-plus"></i> ลงทะเบียนผู้เชี่ยวชาญ
+                    </a>
+                </div>
             </header>
 
             <!-- Search & Filters -->
-            <div
+            <div class="search-container-expert"
                 style="background: white; padding: 1.5rem; border-radius: 1rem; border: 1px solid var(--border-color); margin-bottom: 2rem;">
+
                 <form method="GET" style="display: flex; gap: 1rem; flex-wrap: wrap;">
                     <div style="flex: 1; min-width: 300px; position: relative;">
                         <i data-lucide="search"
@@ -82,6 +90,40 @@ if ($pdo) {
                 </form>
             </div>
 
+            <style>
+                .expert-card {
+                    text-decoration: none;
+                    color: inherit;
+                    flex-direction: row;
+                    align-items: center;
+                    gap: 2rem;
+                    transition: var(--transition-base);
+                    cursor: pointer;
+                    display: flex;
+                    padding: 1.5rem;
+                    background: white;
+                    border-radius: 1rem;
+                    border: 1px solid var(--border-color);
+                }
+                @media (max-width: 640px) {
+                    .expert-card {
+                        flex-direction: column;
+                        text-align: center;
+                        gap: 1.25rem;
+                    }
+                    .expert-info {
+                        text-align: center;
+                    }
+                    .expert-stats {
+                        justify-content: center;
+                    }
+                    .search-container-expert form > * {
+                        width: 100% !important;
+                        flex: none !important;
+                    }
+                }
+            </style>
+
             <div class="knowledge-grid" style="grid-template-columns: 1fr;">
                 <?php if (empty($experts)): ?>
                     <div
@@ -92,15 +134,13 @@ if ($pdo) {
                     </div>
                 <?php endif; ?>
                 <?php foreach ($experts as $expert): ?>
-                    <a href="expert_view.php?id=<?php echo $expert['id']; ?>" class="card-knowledge"
-                        style="text-decoration: none; color: inherit; flex-direction: row; align-items: center; gap: 2rem; transition: var(--transition-base); cursor: pointer; display: flex;">
+                    <a href="expert_view.php?id=<?php echo $expert['id']; ?>" class="expert-card">
                         <div class="profile-avatar-large"
-                            style="width: 80px; height: 80px; border-radius: 20px; background: var(--teal-primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 800; flex-shrink: 0; background-image: url('uploads/avatars/<?php echo $expert['avatar'] ?? 'default.png'; ?>'); background-size: cover; background-position: center; overflow: hidden;">
-                            <?php if (!isset($expert['avatar']) || $expert['avatar'] === 'default.png'): ?>
-                                <?php echo strtoupper(substr($expert['username'], 0, 1)); ?>
-                            <?php endif; ?>
+
+                            style="width: 80px; height: 80px; border-radius: 20px; background: var(--teal-primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 800; flex-shrink: 0; <?php if(!empty($expert['avatar']) && file_exists('uploads/avatars/'.$expert['avatar'])) echo "background-image: url('uploads/avatars/".htmlspecialchars($expert['avatar'])."'); background-size: cover; background-position: center; color: transparent;"; ?> overflow: hidden;">
+                            <?php if(empty($expert['avatar']) || !file_exists('uploads/avatars/'.$expert['avatar'])) echo mb_strtoupper(mb_substr($expert['username'], 0, 1, 'UTF-8'), 'UTF-8'); ?>
                         </div>
-                        <div style="flex: 1;">
+                        <div class="expert-info" style="flex: 1;">
                             <h3 style="margin-bottom: 0.25rem; font-weight: 700;">
                                 <?php echo htmlspecialchars($expert['full_name']); ?>
                             </h3>
@@ -108,16 +148,17 @@ if ($pdo) {
                                 style="font-size: 0.875rem; color: var(--teal-primary); font-weight: 600; margin-bottom: 0.5rem;">
                                 <?php echo htmlspecialchars($expert['specialty'] ?? 'ผู้เชี่ยวชาญทั่วไป'); ?>
                             </p>
-                            <div
+                            <div class="expert-stats"
                                 style="display: flex; gap: 1.5rem; color: hsl(var(--muted-foreground)); font-size: 0.8125rem;">
                                 <span style="display: flex; align-items: center; gap: 4px;"><i data-lucide="award"
-                                        style="width: 14px;"></i>
-                                    <?php echo $expert['points']; ?> แต้มปัญญา</span>
+                                         style="width: 14px;"></i>
+                                     <?php echo $expert['points']; ?> แต้มปัญญา</span>
                                 <span style="display: flex; align-items: center; gap: 4px;"><i data-lucide="file-text"
-                                        style="width: 14px;"></i>
-                                    <?php echo $expert['doc_count']; ?> บทความ</span>
+                                         style="width: 14px;"></i>
+                                     <?php echo $expert['doc_count']; ?> บทความ</span>
                             </div>
                         </div>
+
                         <div style="font-size: 1.5rem; font-weight: 800; color: hsl(var(--muted)); opacity: 0.5;">
                             #<?php echo array_search($expert, $experts) + 1; ?>
                         </div>

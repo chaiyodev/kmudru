@@ -16,7 +16,7 @@ if ($pdo) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>หมวดหมู่ความรู้ | UDRU Wisdom</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo filemtime('assets/css/style.css'); ?>">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
@@ -36,14 +36,16 @@ if ($pdo) {
                     <p>สำรวจองค์ความรู้แยกตามรายวิชาและสายงาน</p>
                 </div>
                 <div class="header-actions">
-                    <a href="category_create.php" class="btn-primary"><i data-lucide="plus"></i>สร้างหมวดหมู่ใหม่</a>
+                    <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
+                        <a href="category_create.php" class="btn-primary"><i data-lucide="settings"></i>จัดการหมวดหมู่</a>
+                    <?php endif; ?>
                 </div>
             </header>
 
             <div class="knowledge-grid">
                 <?php foreach ($categories as $cat): ?>
                     <div class="card-knowledge"
-                        onclick="location.href='browse.php?search=<?php echo urlencode($cat['name']); ?>'"
+                        onclick="location.href='browse.php?cat_id=<?php echo $cat['id']; ?>'"
                         style="cursor:pointer;">
                         <div
                             style="width: 48px; height: 48px; border-radius: 12px; background: hsl(var(--primary) / 0.1); color: var(--teal-primary); display: flex; align-items: center; justify-content: center; margin-bottom: 1.25rem;">

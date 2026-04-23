@@ -20,5 +20,6 @@ return [
     'app' => [
         'name' => 'UDRU Wisdom',
         'url' => 'http://localhost/kmudru',
+        'version' => 'prapakorn1.1.0',
     ]
 ];

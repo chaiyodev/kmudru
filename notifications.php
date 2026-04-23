@@ -10,7 +10,7 @@ $user_id = $_SESSION['user_id'];
 // Mark all as read when viewing this page
 mark_all_read($pdo, $user_id);
 
-$notifications = get_recent_notifications($pdo, $user_id, 20);
+$notifications = get_recent_notifications($pdo, $user_id, 50);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -19,7 +19,7 @@ $notifications = get_recent_notifications($pdo, $user_id, 20);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>การแจ้งเตือน | UDRU Wisdom</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo filemtime('assets/css/style.css'); ?>">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
@@ -120,12 +120,17 @@ $notifications = get_recent_notifications($pdo, $user_id, 20);
                             $icon = 'file-plus';
                         if ($n['type'] == 'system')
                             $icon = 'shield-info';
+                        if ($n['type'] == 'chat')
+                            $icon = 'message-square';
                         ?>
                         <a href="<?php echo htmlspecialchars($n['link']); ?>"
                             class="notif-item <?php echo !$n['is_read'] ? 'unread' : ''; ?>">
-                            <div class="notif-icon"><i data-lucide="<?php echo $icon; ?>"></i></div>
+                            <div class="notif-icon" style="<?php echo $n['type'] == 'chat' ? 'background: rgba(14, 165, 233, 0.1); color: #0ea5e9;' : ''; ?>"><i data-lucide="<?php echo $icon; ?>"></i></div>
                             <div class="notif-content">
                                 <div class="notif-msg">
+                                    <?php if($n['type'] == 'chat' && !empty($n['sender_name'])): ?>
+                                        <span style="color: var(--teal-primary);">[ข้อความจาก <?php echo htmlspecialchars($n['sender_name']); ?>]</span> 
+                                    <?php endif; ?>
                                     <?php echo htmlspecialchars($n['message']); ?>
                                 </div>
                                 <div class="notif-time">

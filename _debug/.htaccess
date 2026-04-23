@@ -1,0 +1,8 @@
+# Block all access to debug/maintenance files
+# These files should NEVER be accessible from the web
+Order deny,allow
+Deny from all
+
+# Allow only localhost for emergency maintenance
+# Allow from 127.0.0.1
+# Allow from ::1

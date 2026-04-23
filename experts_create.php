@@ -19,6 +19,7 @@ $message = '';
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf_token($_POST['csrf_token'] ?? '');
     $specialty = $_POST['specialty'];
     $bio = $_POST['bio'];
     $department = $_POST['department'];
@@ -26,6 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $stmt = $pdo->prepare("UPDATE users SET specialty = ?, bio = ?, department = ?, role = 'contributor' WHERE id = ?");
         $stmt->execute([$specialty, $bio, $department, $user_id]);
+        log_activity('profile_update', 'user', "Specialty: $specialty | Dept: $department");
         $message = "ลงทะเบียนข้อมูลผู้เชี่ยวชาญเรียบร้อยแล้ว! ตอนนี้คุณสามารถแบ่งปันความรู้ได้เต็มรูปแบบ";
 
         // Handle Avatar Upload
@@ -45,6 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (move_uploaded_file($fileTmpPath, $dest_path)) {
                 $stmt = $pdo->prepare("UPDATE users SET avatar = ? WHERE id = ?");
                 $stmt->execute([$newFileName, $user_id]);
+                log_activity('avatar_upload', 'user', "New avatar: $newFileName");
                 $_SESSION['avatar'] = $newFileName;
             }
         }
@@ -81,6 +84,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             padding: 3rem;
             box-shadow: rgba(20, 29, 31, 0.05) 0px 1px 2px 0px;
         }
+
+        @media (max-width: 640px) {
+            .experts-form {
+                padding: 1.5rem;
+            }
+        }
     </style>
 </head>
 
@@ -97,23 +106,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </header>
 
             <?php if ($message): ?>
-                <div
-                    style="max-width: 800px; margin: 0 auto 2rem; background: hsl(142 76% 36% / 0.1); color: hsl(142 76% 36%); padding: 1.25rem; border-radius: 1rem; text-align: center; border: 1px solid hsl(142 76% 36% / 0.2);">
-                    <?php echo $message; ?>
-                    <div style="margin-top: 1rem;"><a href="experts.php" class="btn-primary"
-                            style="display:inline-flex;">ดูทำเนียบผู้เชี่ยวชาญ</a></div>
-                </div>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'ลงทะเบียนสำเร็จ!',
+                            text: '<?php echo addslashes($message); ?>',
+                            confirmButtonColor: 'var(--teal-primary)'
+                        });
+                    });
+                </script>
+            <?php endif; ?>
+
+            <?php if ($error): ?>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'เกิดข้อผิดพลาด',
+                            text: '<?php echo addslashes($error); ?>',
+                            confirmButtonColor: 'var(--teal-primary)'
+                        });
+                    });
+                </script>
             <?php endif; ?>
 
             <div class="experts-form">
                 <form action="experts_create.php" method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                     <div
                         style="text-align: center; margin-bottom: 2.5rem; padding-bottom: 2rem; border-bottom: 1px solid var(--border-color);">
                         <div class="avatar-edit-container">
                             <?php
                             $avatar_url = !empty($user_data['avatar']) ? 'uploads/avatars/' . $user_data['avatar'] : '';
                             $has_avatar = !empty($avatar_url) && file_exists(__DIR__ . '/' . $avatar_url);
-                            $initials = strtoupper(substr($user_data['username'], 0, 1));
+                            $initials = mb_strtoupper(mb_substr($user_data['username'], 0, 1, 'UTF-8'), 'UTF-8');
                             ?>
                             <div class="avatar-preview-wrapper" id="avatar-preview"
                                 style="<?php echo $has_avatar ? "background-image: url('$avatar_url');" : ""; ?>">

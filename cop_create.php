@@ -46,6 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
         $stmt->execute([$community_id, $user_id]);
 
         $pdo->commit();
+        log_activity('cop_create', 'community', "Name: $name");
         $message = "สร้างชุมชน CoP ใหม่เรียบร้อยแล้ว!";
         header("Location: cop.php?status=success");
         exit;
@@ -72,6 +73,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_logged_in()) {
             display: grid;
             grid-template-columns: 1.2fr 0.8fr;
             gap: 2.5rem;
+        }
+        
+        @media (max-width: 1024px) {
+            .creator-split {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+            .creation-card {
+                padding: 1.5rem;
+            }
+            .preview-sticky {
+                position: relative;
+                top: 0;
+            }
         }
 
         .creation-card {

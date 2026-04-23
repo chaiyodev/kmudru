@@ -8,8 +8,13 @@ $user_id = is_logged_in() ? $_SESSION['user_id'] : 0;
 $doc = null;
 
 if ($id > 0 && $pdo) {
-    // Handle Like Toggle
-    if (isset($_POST['action']) && $_POST['action'] === 'like' && $user_id > 0) {
+    // Handle POST Actions (CSRF Protected)
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        try {
+            verify_csrf_token($_POST['csrf_token'] ?? '');
+            
+            // Handle Like Toggle
+            if (isset($_POST['action']) && $_POST['action'] === 'like' && $user_id > 0) {
         $check = $pdo->prepare("SELECT id FROM document_likes WHERE document_id = ? AND user_id = ?");
         $check->execute([$id, $user_id]);
         if ($check->fetch()) {
@@ -17,24 +22,37 @@ if ($id > 0 && $pdo) {
         } else {
             $pdo->prepare("INSERT INTO document_likes (document_id, user_id) VALUES (?, ?)")->execute([$id, $user_id]);
             $pdo->prepare("UPDATE users SET points = points + 5 WHERE id = (SELECT user_id FROM documents WHERE id = ?)")->execute([$id]);
+            log_activity('document_like', 'document', "Doc ID: $id");
         }
     }
 
-    // Handle Comment
-    if (isset($_POST['comment']) && !empty(trim($_POST['comment'])) && $user_id > 0) {
-        $stmt = $pdo->prepare("INSERT INTO comments (document_id, user_id, comment) VALUES (?, ?, ?)");
-        $stmt->execute([$id, $user_id, trim($_POST['comment'])]);
+            // Handle Comment
+            if (isset($_POST['comment']) && !empty(trim($_POST['comment'])) && $user_id > 0) {
+                $stmt = $pdo->prepare("INSERT INTO comments (document_id, user_id, comment) VALUES (?, ?, ?)");
+                $stmt->execute([$id, $user_id, trim($_POST['comment'])]);
+                log_activity('comment_add', 'document', "Doc ID: $id");
+            }
+
+            // Handle Delete Document (Admin Only)
+            if (isset($_POST['action']) && $_POST['action'] === 'delete_doc' && isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
+                $pdo->prepare("DELETE FROM documents WHERE id = ?")->execute([$id]);
+                log_activity('document_delete', 'document', "Doc ID: $id");
+                header("Location: browse.php?msg=deleted");
+                exit;
+            }
+        } catch (Exception $e) {
+            error_log("View.php POST error: " . $e->getMessage());
+            header("Location: view.php?id=$id&error=1");
+            exit;
+        }
     }
 
-    // Handle Delete Document (Admin Only)
-    if (isset($_POST['action']) && $_POST['action'] === 'delete_doc' && isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
-        $pdo->prepare("DELETE FROM documents WHERE id = ?")->execute([$id]);
-        header("Location: browse.php?msg=deleted");
-        exit;
+    // Increase view count (throttled: once per session per document)
+    $view_key = 'viewed_doc_' . $id;
+    if (!isset($_SESSION[$view_key])) {
+        $pdo->prepare("UPDATE documents SET views = views + 1 WHERE id = ?")->execute([$id]);
+        $_SESSION[$view_key] = time();
     }
-
-    // Increase view count
-    $pdo->prepare("UPDATE documents SET views = views + 1 WHERE id = ?")->execute([$id]);
 
     // Fetch Document
     $stmt = $pdo->prepare("SELECT d.*, c.name as category_name, u.full_name as author_name, u.username as author_username, u.points as author_points, u.specialty as author_specialty
@@ -56,7 +74,7 @@ if ($id > 0 && $pdo) {
         $user_liked = (bool) $liked_stmt->fetch();
     }
 
-    $comments_stmt = $pdo->prepare("SELECT c.*, u.full_name, u.username FROM comments c JOIN users u ON c.user_id = u.id WHERE c.document_id = ? ORDER BY c.created_at DESC");
+    $comments_stmt = $pdo->prepare("SELECT c.*, u.full_name, u.username, u.avatar FROM comments c JOIN users u ON c.user_id = u.id WHERE c.document_id = ? ORDER BY c.created_at DESC");
     $comments_stmt->execute([$id]);
     $comments = $comments_stmt->fetchAll();
 }
@@ -80,30 +98,8 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        .article-content {
-            line-height: 1.9;
-            font-size: 1.0625rem;
-            white-space: pre-wrap;
-            color: hsl(var(--foreground));
-        }
-
-        .comment-card {
-            background: white;
-            border-radius: 1rem;
-            border: 1px solid var(--border-color);
-            padding: 1.5rem;
-            margin-bottom: 1rem;
-        }
-
-        .author-card {
-            background: white;
-            border-radius: 1.5rem;
-            border: 1px solid var(--border-color);
-            padding: 2rem;
-            text-align: center;
-        }
-    </style>
+    <link rel="stylesheet" href="assets/css/view.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 
 <body>
@@ -113,67 +109,202 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
         <main class="main-viewport">
             <header class="header-top">
                 <div class="page-title">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <a href="browse.php" style="color: var(--teal-primary); text-decoration: none; font-weight: 600; font-size: 0.875rem;">คลังความรู้</a>
+                        <i data-lucide="chevron-right" style="width: 14px; color: #94a3b8;"></i>
+                        <span style="font-size: 0.875rem; color: #64748b;"><?php echo $type_labels[$doc['type']]; ?></span>
+                    </div>
                     <h2>รายละเอียดความรู้</h2>
-                    <p><?php echo $type_labels[$doc['type']]; ?> •
-                        <?php echo htmlspecialchars($doc['category_name']); ?>
-                    </p>
                 </div>
                 <div class="header-actions">
-                    <a href="browse.php" class="btn-primary"
-                        style="background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));"><i
-                            data-lucide="arrow-left"></i>กลับ</a>
-                    <a href="create.php" class="btn-primary"><i data-lucide="plus"></i>สร้างใหม่</a>
+                    <button onclick="history.back()" class="btn-primary" style="background: white; color: #1e293b; border: 1px solid var(--border-color);">
+                        <i data-lucide="arrow-left"></i> กลับ
+                    </button>
+                    <a href="<?php echo is_logged_in() ? 'create.php' : 'javascript:void(0)'; ?>" 
+                       onclick="<?php echo is_logged_in() ? '' : "return requireLoginPrompt('สร้างบทความใหม่')"; ?>" 
+                       class="btn-primary"><i data-lucide="plus"></i>สร้างใหม่</a>
                 </div>
             </header>
 
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem;">
+            <div class="view-grid">
                 <!-- Main Article -->
                 <div>
-                    <article
-                        style="background: white; border-radius: 1.5rem; border: 1px solid var(--border-color); padding: 3rem; margin-bottom: 2rem;">
-                        <span class="tag-badge"
-                            style="background: hsl(var(--primary)/0.1); color: var(--teal-primary); margin-bottom: 1.5rem; display: inline-block;"><?php echo $type_labels[$doc['type']]; ?></span>
+                    <article class="article-card">
+                        <?php 
+                        $cover_image = null;
+                        $album_images = [];
+                        $attachments = [];
+                        
+                        // Fetch album images
+                        try {
+                            $stmt = $pdo->prepare("SELECT file_path FROM document_images WHERE document_id = ? ORDER BY id ASC");
+                            $stmt->execute([$doc['id']]);
+                            $album_images = $stmt->fetchAll(PDO::FETCH_COLUMN);
+                        } catch (PDOException $e) {
+                            // Table may not exist yet
+                        }
 
-                        <h1 style="font-size: 2rem; font-weight: 800; line-height: 1.3; margin-bottom: 1.5rem;">
+                        // Fetch attachments
+                        try {
+                            $stmt = $pdo->prepare("SELECT * FROM attachments WHERE document_id = ? ORDER BY id ASC");
+                            $stmt->execute([$doc['id']]);
+                            $attachments = $stmt->fetchAll();
+                        } catch (PDOException $e) {
+                            // Table may not exist yet
+                        }
+
+                        if (!empty($album_images)) {
+                            $cover_image = $album_images[0];
+                        } else {
+                            if (preg_match('/<img[^>]+src="([^">]+)"/i', $doc['content'], $matches)) {
+                                $cover_image = $matches[1];
+                            } elseif (preg_match('/!\[.*?\]\((.*?)\)/i', $doc['content'], $matches)) {
+                                $cover_image = $matches[1];
+                            }
+                        }
+                        ?>
+                        <?php if ($cover_image): ?>
+                            <div class="article-cover-banner">
+                                <div class="article-cover-overlay"></div>
+                                <img src="<?php echo htmlspecialchars($cover_image); ?>" loading="lazy">
+                            </div>
+                        <?php endif; ?>
+
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem;">
+                            <span class="tag-badge" style="background: hsl(var(--primary)/0.1); color: var(--teal-primary);"><?php echo $type_labels[$doc['type']]; ?></span>
+                            <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; background: #f8fafc; padding: 4px 12px; border-radius: 20px;">
+                                ID: #<?php echo str_pad($doc['id'], 5, '0', STR_PAD_LEFT); ?>
+                            </div>
+                        </div>
+
+                        <h1 class="article-title">
                             <?php echo htmlspecialchars($doc['title']); ?>
                         </h1>
 
-                        <div
-                            style="display: flex; gap: 1.5rem; color: hsl(var(--muted-foreground)); font-size: 0.875rem; padding-bottom: 2rem; margin-bottom: 2rem; border-bottom: 1px solid var(--border-color);">
-                            <span><i data-lucide="user"
-                                    style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i><?php echo htmlspecialchars($doc['author_name']); ?></span>
-                            <span><i data-lucide="calendar"
-                                    style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i><?php echo date('d M Y', strtotime($doc['created_at'])); ?></span>
-                            <span><i data-lucide="eye"
-                                    style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i><?php echo $doc['views']; ?></span>
-                            <span><i data-lucide="heart"
-                                    style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i><?php echo $total_likes; ?></span>
+                        <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; color: #64748b; font-size: 0.875rem; padding-bottom: 0.5rem; margin-bottom: 0.5rem; border-bottom: 1px solid #f1f5f9;">
+                            <div class="view-stat-item"><i data-lucide="user" style="width: 16px;"></i> <?php echo htmlspecialchars($doc['author_name']); ?></div>
+                            <div class="view-stat-item"><i data-lucide="calendar" style="width: 16px;"></i> <?php echo date('d M Y', strtotime($doc['created_at'])); ?></div>
+                            <div class="view-stat-item"><i data-lucide="folder" style="width: 16px;"></i> <?php echo htmlspecialchars($doc['category_name']); ?></div>
+                            <div class="view-stat-item"><i data-lucide="eye" style="width: 16px;"></i> <?php echo number_format($doc['views']); ?> ครั้ง</div>
                         </div>
 
-                        <div class="article-content"><?php echo nl2br(htmlspecialchars($doc['content'])); ?></div>
+                        <div class="article-content" id="article-body">
+                            <?php 
+                            if ($doc['type'] === 'wiki') {
+                                // Content will be rendered via JS marked.js
+                                echo '<div id="markdown-content" style="display:none;">' . htmlspecialchars($doc['content']) . '</div>';
+                                echo '<div id="rendered-content"></div>';
+                            } else {
+                                echo nl2br(htmlspecialchars($doc['content'])); 
+                            }
+                            ?>
+                        </div>
 
-                        <div
-                            style="display: flex; gap: 0.75rem; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border-color);">
-                            <form method="POST" style="display:inline;">
-                                <input type="hidden" name="action" value="like">
-                                <button type="submit" class="btn-primary"
-                                    style="<?php echo $user_liked ? 'background: hsl(339 90% 50%); color: white;' : 'background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));'; ?>">
-                                    <i data-lucide="heart"></i><?php echo $user_liked ? 'คุณชอบแล้ว' : 'ถูกใจ'; ?>
-                                    (<?php echo $total_likes; ?>)
+                        <?php if ($doc['type'] === 'wiki'): ?>
+                        <script>
+                            document.addEventListener('DOMContentLoaded', function() {
+                                marked.setOptions({ breaks: true, gfm: true });
+                                const raw = document.getElementById('markdown-content').textContent;
+                                document.getElementById('rendered-content').innerHTML = marked.parse(raw);
+                                lucide.createIcons();
+                            });
+                        </script>
+                        <?php endif; ?>
+
+                        <?php if(!empty($album_images)): ?>
+                        <div style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border-color);">
+                            <h3 style="font-size: 1.125rem; font-weight: 800; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                                <div style="width: 32px; height: 32px; background: rgba(20, 184, 166, 0.1); color: var(--teal-primary); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                                    <i data-lucide="image" style="width: 16px;"></i>
+                                </div>
+                                อัลบั้มภาพ
+                            </h3>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem;">
+                                <?php foreach($album_images as $img): ?>
+                                    <div onclick="openImageModal('<?php echo htmlspecialchars($img); ?>')" style="display: block; aspect-ratio: 4/3; border-radius: 0.75rem; overflow: hidden; border: 1px solid var(--border-color); cursor: zoom-in; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                                        <img src="<?php echo htmlspecialchars($img); ?>" style="width: 100%; height: 100%; object-fit: cover;">
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
+                        <?php if(!empty($attachments)): ?>
+                        <div style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border-color);">
+                            <h3 style="font-size: 1.125rem; font-weight: 800; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                                <div style="width: 32px; height: 32px; background: rgba(20, 184, 166, 0.1); color: var(--teal-primary); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                                    <i data-lucide="paperclip" style="width: 16px;"></i>
+                                </div>
+                                เอกสารแนบ
+                            </h3>
+                            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                                <?php foreach($attachments as $file): ?>
+                                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 1rem; background: #f8fafc; border-radius: 0.75rem; border: 1px solid var(--border-color);">
+                                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                            <div style="width: 40px; height: 40px; background: white; border: 1px solid var(--border-color); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--teal-primary);">
+                                                <?php 
+                                                $ext = strtolower(pathinfo($file['file_name'], PATHINFO_EXTENSION));
+                                                $icon = 'file-text';
+                                                if ($ext === 'pdf') $icon = 'file-type-2';
+                                                elseif (in_array($ext, ['doc', 'docx'])) $icon = 'file-text';
+                                                elseif (in_array($ext, ['xls', 'xlsx'])) $icon = 'table-2';
+                                                elseif (in_array($ext, ['ppt', 'pptx'])) $icon = 'presentation';
+                                                ?>
+                                                <i data-lucide="<?php echo $icon; ?>"></i>
+                                            </div>
+                                            <div>
+                                                <div style="font-weight: 700; font-size: 0.875rem; color: #1e293b;"><?php echo htmlspecialchars($file['file_name']); ?></div>
+                                                <div style="font-size: 0.75rem; color: #64748b;"><?php echo round($file['file_size'] / 1024, 2); ?> KB</div>
+                                            </div>
+                                        </div>
+                                        <a href="<?php echo htmlspecialchars($file['file_path']); ?>" target="_blank" class="btn-primary" style="padding: 0.5rem 1rem; font-size: 0.75rem;">
+                                            <i data-lucide="download" style="width: 14px; height: 14px;"></i> ดาวน์โหลด
+                                        </a>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
+                        <div class="article-actions">
+                            <?php if (is_logged_in()): ?>
+                                <form method="POST" style="display:inline;">
+                                    <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
+                                    <input type="hidden" name="action" value="like">
+                                    <button type="submit" class="btn-primary"
+                                        style="<?php echo $user_liked ? 'background: hsl(339 90% 50%); color: white;' : 'background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));'; ?>">
+                                        <i data-lucide="heart"></i><?php echo $user_liked ? 'คุณชอบแล้ว' : 'ถูกใจ'; ?>
+                                        (<?php echo $total_likes; ?>)
+                                    </button>
+                                </form>
+                            <?php else: ?>
+                                <button type="button" class="btn-primary" onclick="requireLoginPrompt('ถูกใจบทความ')"
+                                    style="background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));">
+                                    <i data-lucide="heart"></i>ถูกใจ (<?php echo $total_likes; ?>)
                                 </button>
-                            </form>
+                            <?php endif; ?>
+                            
                             <button class="btn-primary"
                                 style="background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));"
-                                onclick="document.getElementById('comment-box').focus()"><i
-                                    data-lucide="message-square"></i>แสดงความเห็น</button>
+                                onclick="<?php echo is_logged_in() ? "document.getElementById('comment-box').focus()" : "requireLoginPrompt('แสดงความคิดเห็น')"; ?>">
+                                <i data-lucide="message-square"></i>แสดงความเห็น
+                            </button>
                             <button class="btn-primary"
                                 style="background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));"><i
                                     data-lucide="share-2"></i>แชร์</button>
+
+                            <?php if (is_logged_in() && ($doc['user_id'] == $_SESSION['user_id'] || (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'))): ?>
+                                <a href="edit.php?id=<?php echo $doc['id']; ?>" class="btn-primary"
+                                    style="background: hsl(45 93% 47% / 0.1); color: hsl(45 93% 47%); border: 1px solid hsl(45 93% 47% / 0.2);">
+                                    <i data-lucide="pencil"></i>แก้ไข
+                                </a>
+                            <?php endif; ?>
 
                             <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
                                 <form method="POST"
                                     onsubmit="return confirm('คุณต้องการลบบทความนี้ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้');"
                                     style="display:inline;">
+                                    <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                                     <input type="hidden" name="action" value="delete_doc">
                                     <button type="submit" class="btn-primary"
                                         style="background: hsl(0 84% 60% / 0.1); color: hsl(0 84% 60%); border: 1px solid hsl(0 84% 60% / 0.2);">
@@ -194,6 +325,7 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
 
                         <?php if (is_logged_in()): ?>
                             <form method="POST" style="margin-bottom: 2rem;">
+                                <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                                 <textarea id="comment-box" name="comment" placeholder="แบ่งปันมุมมองของคุณ..."
                                     style="width: 100%; padding: 1rem; border: 1px solid var(--border-color); border-radius: 0.75rem; min-height: 100px; font-family: inherit; resize: vertical; outline: none; transition: var(--transition-base);"
                                     onfocus="this.style.borderColor='var(--teal-primary)';this.style.boxShadow='0 0 0 3px hsl(var(--primary)/0.1)'"
@@ -201,6 +333,8 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                                 <div style="text-align: right; margin-top: 1rem;"><button type="submit"
                                         class="btn-primary">ส่งความคิดเห็น</button></div>
                             </form>
+                        <?php else: ?>
+                            <!-- Guest view: No comment box, alert triggered by action buttons -->
                         <?php endif; ?>
 
                         <div style="display: flex; flex-direction: column; gap: 1rem;">
@@ -209,10 +343,14 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                                     <div
                                         style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
                                         <div style="display: flex; align-items: center; gap: 0.75rem;">
-                                            <div
-                                                style="width: 32px; height: 32px; border-radius: 10px; background: var(--teal-primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.75rem;">
-                                                <?php echo strtoupper(substr($c['username'], 0, 1)); ?>
-                                            </div>
+                                            <?php if (!empty($c['avatar']) && file_exists('uploads/avatars/' . $c['avatar'])): ?>
+                                                <div style="width: 32px; height: 32px; border-radius: 10px; background-image: url('uploads/avatars/<?php echo htmlspecialchars($c['avatar']); ?>'); background-size: cover; background-position: center; border: 1px solid var(--border-color);"></div>
+                                            <?php else: ?>
+                                                <div
+                                                    style="width: 32px; height: 32px; border-radius: 10px; background: var(--teal-primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.75rem;">
+                                                    <?php echo htmlspecialchars(mb_strtoupper(mb_substr($c['username'], 0, 1, 'UTF-8'), 'UTF-8')); ?>
+                                                </div>
+                                            <?php endif; ?>
                                             <span
                                                 style="font-weight: 700;"><?php echo htmlspecialchars($c['full_name']); ?></span>
                                         </div>
@@ -235,10 +373,32 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                 <!-- Author Sidebar -->
                 <aside>
                     <div class="author-card">
-                        <div
-                            style="width: 80px; height: 80px; border-radius: 24px; background: var(--teal-primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 800; margin: 0 auto 1.5rem; box-shadow: 0 0 0 6px hsl(var(--primary)/0.1);">
-                            <?php echo strtoupper(substr($doc['author_username'] ?? 'KM', 0, 2)); ?>
-                        </div>
+                        <?php
+                        // Fetch author profile image and additional info
+                        $author_img = null;
+                        $author_doc_count = 0;
+                        $author_joined = '';
+                        try {
+                            $author_stmt = $pdo->prepare("SELECT avatar, created_at FROM users WHERE id = ?");
+                            $author_stmt->execute([$doc['user_id']]);
+                            $author_data = $author_stmt->fetch();
+                            if ($author_data) {
+                                $author_img = !empty($author_data['avatar']) ? 'uploads/avatars/' . $author_data['avatar'] : null;
+                                $author_joined = date('M Y', strtotime($author_data['created_at']));
+                            }
+                            $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM documents WHERE user_id = ?");
+                            $count_stmt->execute([$doc['user_id']]);
+                            $author_doc_count = $count_stmt->fetchColumn();
+                        } catch (PDOException $e) {}
+                        ?>
+                        <?php if ($author_img && file_exists(__DIR__ . '/' . $author_img)): ?>
+                            <img src="<?php echo htmlspecialchars($author_img); ?>" 
+                                style="width: 80px; height: 80px; border-radius: 24px; object-fit: cover; margin: 0 auto 1.5rem; display: block; box-shadow: 0 0 0 4px hsl(var(--primary)/0.15);">
+                        <?php else: ?>
+                            <div style="width: 80px; height: 80px; border-radius: 24px; background: var(--teal-primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 800; margin: 0 auto 1.5rem; box-shadow: 0 0 0 4px hsl(var(--primary)/0.15);">
+                                <?php echo mb_strtoupper(mb_substr($doc['author_username'] ?? 'KM', 0, 2, 'UTF-8'), 'UTF-8'); ?>
+                            </div>
+                        <?php endif; ?>
                         <h4 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 0.25rem;">
                             <?php echo htmlspecialchars($doc['author_name']); ?>
                         </h4>
@@ -246,33 +406,67 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                             <?php echo htmlspecialchars($doc['author_specialty'] ?? 'ผู้เชี่ยวชาญประจำระบบ'); ?>
                         </p>
 
-                        <div
-                            style="display: flex; justify-content: space-around; background: hsl(var(--muted)/0.3); padding: 1rem; border-radius: 1rem;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; background: hsl(var(--muted)/0.3); padding: 1rem; border-radius: 1rem; text-align: center;">
                             <div>
                                 <div style="font-weight: 800; color: var(--teal-primary); font-size: 1.25rem;">
                                     <?php echo $doc['author_points'] ?? 0; ?>
                                 </div>
-                                <div
-                                    style="font-size: 0.6875rem; color: hsl(var(--muted-foreground)); text-transform: uppercase; font-weight: 600;">
-                                    XP</div>
+                                <div style="font-size: 0.6875rem; color: hsl(var(--muted-foreground)); text-transform: uppercase; font-weight: 600;">XP</div>
                             </div>
-                            <div style="width: 1px; background: var(--border-color);"></div>
-                            <div>
-                                <div style="font-weight: 800; color: hsl(var(--foreground)); font-size: 1.25rem;">Expert
+                            <div style="border-left: 1px solid var(--border-color); border-right: 1px solid var(--border-color);">
+                                <div style="font-weight: 800; color: hsl(var(--foreground)); font-size: 1.25rem;">
+                                    <?php echo $author_doc_count; ?>
                                 </div>
-                                <div
-                                    style="font-size: 0.6875rem; color: hsl(var(--muted-foreground)); text-transform: uppercase; font-weight: 600;">
-                                    ระดับ</div>
+                                <div style="font-size: 0.6875rem; color: hsl(var(--muted-foreground)); text-transform: uppercase; font-weight: 600;">บทความ</div>
+                            </div>
+                            <div>
+                                <div style="font-weight: 800; color: hsl(var(--foreground)); font-size: 1.1rem;">Expert</div>
+                                <div style="font-size: 0.6875rem; color: hsl(var(--muted-foreground)); text-transform: uppercase; font-weight: 600;">ระดับ</div>
                             </div>
                         </div>
-                        <a href="experts.php" class="btn-primary"
-                            style="width: 100%; justify-content: center; margin-top: 1.5rem; background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));">ดูโปรไฟล์ทั้งหมด</a>
+
+                        <?php if ($author_joined): ?>
+                        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color); font-size: 0.8125rem; color: hsl(var(--muted-foreground)); display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                            <i data-lucide="clock" style="width: 14px;"></i> เข้าร่วมตั้งแต่ <?php echo $author_joined; ?>
+                        </div>
+                        <?php endif; ?>
+
+                        <div style="display: flex; gap: 0.5rem; margin-top: 1.25rem;">
+                            <a href="browse.php?search=<?php echo urlencode($doc['author_name']); ?>" class="btn-primary"
+                                style="flex: 1; justify-content: center; font-size: 0.8125rem; padding: 0.6rem;">
+                                <i data-lucide="book-open" style="width: 14px;"></i>บทความทั้งหมด
+                            </a>
+                            <button onclick="<?php echo is_logged_in() ? "document.getElementById('comment-box').focus()" : "requireLoginPrompt('แสดงความคิดเห็น')"; ?>" class="btn-primary"
+                                style="flex: 1; justify-content: center; font-size: 0.8125rem; padding: 0.6rem; background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));">
+                                <i data-lucide="message-circle" style="width: 14px;"></i>แสดงความเห็น
+                            </button>
+                        </div>
                     </div>
                 </aside>
             </div>
         </main>
     </div>
-    <script>lucide.createIcons();</script>
+    <div id="image-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.9); z-index: 9999; align-items: center; justify-content: center; backdrop-filter: blur(8px); opacity: 0; transition: opacity 0.3s ease;">
+        <button onclick="closeImageModal()" style="position: absolute; top: 20px; right: 20px; background: none; border: none; color: white; cursor: pointer; padding: 10px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+            <i data-lucide="x" style="width: 32px; height: 32px;"></i>
+        </button>
+        <img id="modal-image" src="" style="max-width: 90vw; max-height: 90vh; object-fit: contain; border-radius: 8px; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+    </div>
+    <script>
+        lucide.createIcons();
+        function openImageModal(src) {
+            document.getElementById('modal-image').src = src;
+            const modal = document.getElementById('image-modal');
+            modal.style.display = 'flex';
+            setTimeout(() => modal.style.opacity = '1', 10);
+            document.body.style.overflow = 'hidden';
+        }
+        function closeImageModal() {
+            const modal = document.getElementById('image-modal');
+            modal.style.opacity = '0';
+            setTimeout(() => { modal.style.display = 'none'; document.body.style.overflow = ''; }, 300);
+        }
+    </script>
 </body>
 
 </html>
