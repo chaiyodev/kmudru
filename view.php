@@ -41,12 +41,18 @@ if ($id > 0 && $pdo) {
                 exit;
             }
         } catch (Exception $e) {
-            die($e->getMessage());
+            error_log("View.php POST error: " . $e->getMessage());
+            header("Location: view.php?id=$id&error=1");
+            exit;
         }
     }
 
-    // Increase view count
-    $pdo->prepare("UPDATE documents SET views = views + 1 WHERE id = ?")->execute([$id]);
+    // Increase view count (throttled: once per session per document)
+    $view_key = 'viewed_doc_' . $id;
+    if (!isset($_SESSION[$view_key])) {
+        $pdo->prepare("UPDATE documents SET views = views + 1 WHERE id = ?")->execute([$id]);
+        $_SESSION[$view_key] = time();
+    }
 
     // Fetch Document
     $stmt = $pdo->prepare("SELECT d.*, c.name as category_name, u.full_name as author_name, u.username as author_username, u.points as author_points, u.specialty as author_specialty
@@ -129,31 +135,22 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                         $album_images = [];
                         $attachments = [];
                         
-                        // Check which tables exist first to avoid PDO errors
-                        $existing_tables = [];
+                        // Fetch album images
                         try {
-                            $tbl_check = $pdo->query("SHOW TABLES");
-                            while ($t = $tbl_check->fetch(PDO::FETCH_NUM)) {
-                                $existing_tables[] = $t[0];
-                            }
-                        } catch (PDOException $e) {}
-
-                        // Fetch album images only if table exists
-                        if (in_array('document_images', $existing_tables)) {
-                            try {
-                                $stmt = $pdo->prepare("SELECT file_path FROM document_images WHERE document_id = ? ORDER BY id ASC");
-                                $stmt->execute([$doc['id']]);
-                                $album_images = $stmt->fetchAll(PDO::FETCH_COLUMN);
-                            } catch (PDOException $e) {}
+                            $stmt = $pdo->prepare("SELECT file_path FROM document_images WHERE document_id = ? ORDER BY id ASC");
+                            $stmt->execute([$doc['id']]);
+                            $album_images = $stmt->fetchAll(PDO::FETCH_COLUMN);
+                        } catch (PDOException $e) {
+                            // Table may not exist yet
                         }
 
-                        // Fetch attachments only if table exists
-                        if (in_array('attachments', $existing_tables)) {
-                            try {
-                                $stmt = $pdo->prepare("SELECT * FROM attachments WHERE document_id = ? ORDER BY id ASC");
-                                $stmt->execute([$doc['id']]);
-                                $attachments = $stmt->fetchAll();
-                            } catch (PDOException $e) {}
+                        // Fetch attachments
+                        try {
+                            $stmt = $pdo->prepare("SELECT * FROM attachments WHERE document_id = ? ORDER BY id ASC");
+                            $stmt->execute([$doc['id']]);
+                            $attachments = $stmt->fetchAll();
+                        } catch (PDOException $e) {
+                            // Table may not exist yet
                         }
 
                         if (!empty($album_images)) {
@@ -351,7 +348,7 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                                             <?php else: ?>
                                                 <div
                                                     style="width: 32px; height: 32px; border-radius: 10px; background: var(--teal-primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.75rem;">
-                                                    <?php echo mb_strtoupper(mb_substr($c['username'], 0, 1, 'UTF-8'), 'UTF-8'); ?>
+                                                    <?php echo htmlspecialchars(mb_strtoupper(mb_substr($c['username'], 0, 1, 'UTF-8'), 'UTF-8')); ?>
                                                 </div>
                                             <?php endif; ?>
                                             <span
@@ -382,19 +379,11 @@ $type_labels = ['document' => 'เอกสาร', 'wiki' => 'Wiki', 'qa' => 'Q
                         $author_doc_count = 0;
                         $author_joined = '';
                         try {
-                            // Check if avatar column exists in users table
-                            $col_check = $pdo->query("SHOW COLUMNS FROM users LIKE 'avatar'");
-                            $has_avatar = $col_check->rowCount() > 0;
-                            
-                            if ($has_avatar) {
-                                $author_stmt = $pdo->prepare("SELECT avatar, created_at FROM users WHERE id = ?");
-                            } else {
-                                $author_stmt = $pdo->prepare("SELECT created_at FROM users WHERE id = ?");
-                            }
+                            $author_stmt = $pdo->prepare("SELECT avatar, created_at FROM users WHERE id = ?");
                             $author_stmt->execute([$doc['user_id']]);
                             $author_data = $author_stmt->fetch();
                             if ($author_data) {
-                                $author_img = ($has_avatar && !empty($author_data['avatar'])) ? 'uploads/avatars/' . $author_data['avatar'] : null;
+                                $author_img = !empty($author_data['avatar']) ? 'uploads/avatars/' . $author_data['avatar'] : null;
                                 $author_joined = date('M Y', strtotime($author_data['created_at']));
                             }
                             $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM documents WHERE user_id = ?");

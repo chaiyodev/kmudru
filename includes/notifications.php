@@ -96,31 +96,61 @@ function get_unread_count($pdo, $user_id)
     if (!$user_id)
         return 0;
     try {
+        // 1. Get system notifications count
         $stmt = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0");
         $stmt->execute([$user_id]);
-        return $stmt->fetchColumn();
+        $notif_count = (int)$stmt->fetchColumn();
+
+        // 2. Get unread chat messages count
+        $stmt_chat = $pdo->prepare("SELECT COUNT(*) FROM chat_messages WHERE receiver_id = ? AND is_read = 0");
+        $stmt_chat->execute([$user_id]);
+        $chat_count = (int)$stmt_chat->fetchColumn();
+
+        return $notif_count + $chat_count;
     } catch (PDOException $e) {
-        // Table might not exist yet, return 0 instead of crashing the site
         return 0;
     }
 }
 
-// Get recent notifications
-function get_recent_notifications($pdo, $user_id, $limit = 10)
+// Get recent notifications (including chats)
+function get_recent_notifications($pdo, $user_id, $limit = 20)
 {
     if (!$user_id)
         return [];
-    $stmt = $pdo->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ?");
-    $stmt->bindValue(1, $user_id, PDO::PARAM_INT);
-    $stmt->bindValue(2, $limit, PDO::PARAM_INT);
-    $stmt->execute();
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // UNION system notifications and chats
+    $sql = "
+        (SELECT id, message, 'system' as type, link, is_read, created_at, 'notif' as source, NULL as sender_name 
+         FROM notifications WHERE user_id = :uid)
+        UNION ALL
+        (SELECT m.id, m.message, 'chat' as type, 'chat.php?user=' || m.sender_id as link, m.is_read, m.created_at, 'chat' as source, u.full_name as sender_name 
+         FROM chat_messages m JOIN users u ON m.sender_id = u.id WHERE m.receiver_id = :uid)
+        ORDER BY created_at DESC LIMIT :limit
+    ";
+    
+    try {
+        $stmt = $pdo->prepare($sql);
+        $stmt->bindValue(':uid', $user_id, PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        return [];
+    }
 }
 
 // Mark as read
 function mark_all_read($pdo, $user_id)
 {
-    $stmt = $pdo->prepare("UPDATE notifications SET is_read = 1 WHERE user_id = ?");
-    return $stmt->execute([$user_id]);
+    // 1. Mark system notifications
+    $stmt1 = $pdo->prepare("UPDATE notifications SET is_read = 1 WHERE user_id = ?");
+    $stmt1->execute([$user_id]);
+    
+    // 2. Mark chat messages as read (optional: maybe only when viewing chat page? 
+    // But user asked for numbers to disappear when 'viewing', so if they view 'all notifications' page, it should probably clear them)
+    $stmt2 = $pdo->prepare("UPDATE chat_messages SET is_read = 1 WHERE receiver_id = ?");
+    $stmt2->execute([$user_id]);
+    
+    return true;
 }
 ?>

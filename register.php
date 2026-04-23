@@ -14,11 +14,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $token = $_POST['csrf_token'] ?? '';
     try {
         verify_csrf_token($token);
-        $username = $_POST['username'] ?? '';
+        $username = trim($_POST['username'] ?? '');
         $password = $_POST['password'] ?? '';
-    $full_name = $_POST['full_name'] ?? '';
-    $email = $_POST['email'] ?? '';
+    $full_name = trim($_POST['full_name'] ?? '');
+    $email = trim($_POST['email'] ?? '');
 
+    // Input validation
+    if (empty($username) || empty($password) || empty($full_name) || empty($email)) {
+        $error = "กรุณากรอกข้อมูลให้ครบทุกช่อง";
+    } elseif (!preg_match('/^[a-zA-Z0-9_]{3,30}$/', $username)) {
+        $error = "ชื่อผู้ใช้ต้องเป็นภาษาอังกฤษ ตัวเลข หรือขีดล่าง (3-30 ตัวอักษร)";
+    } elseif (mb_strlen($password) < 8) {
+        $error = "รหัสผ่านต้องมีความยาวอย่างน้อย 8 ตัวอักษร";
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = "รูปแบบอีเมลไม่ถูกต้อง";
+    } else {
     $pdo = get_pdo();
     if ($pdo) {
         try {
@@ -36,6 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (Exception $e) {
             $error = "เกิดข้อผิดพลาด: " . $e->getMessage();
         }
+    }
     }
     } catch (Exception $e) {
         $error = "เกิดข้อผิดพลาด: " . $e->getMessage();

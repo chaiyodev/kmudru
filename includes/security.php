@@ -53,6 +53,8 @@ function verify_csrf_token($token)
     if (empty($_SESSION['csrf_token']) || $token !== $_SESSION['csrf_token']) {
         throw new Exception("ความปลอดภัยผิดพลาด (Session/CSRF Expired) กรุณารีเฟรชหน้าจอหรือลองใหม่อีกครั้งเพื่อความปลอดภัยครับ");
     }
+    // Regenerate token after successful verification to prevent replay attacks
+    unset($_SESSION['csrf_token']);
     return true;
 }
 

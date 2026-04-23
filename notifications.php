@@ -10,7 +10,7 @@ $user_id = $_SESSION['user_id'];
 // Mark all as read when viewing this page
 mark_all_read($pdo, $user_id);
 
-$notifications = get_recent_notifications($pdo, $user_id, 20);
+$notifications = get_recent_notifications($pdo, $user_id, 50);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -120,12 +120,17 @@ $notifications = get_recent_notifications($pdo, $user_id, 20);
                             $icon = 'file-plus';
                         if ($n['type'] == 'system')
                             $icon = 'shield-info';
+                        if ($n['type'] == 'chat')
+                            $icon = 'message-square';
                         ?>
                         <a href="<?php echo htmlspecialchars($n['link']); ?>"
                             class="notif-item <?php echo !$n['is_read'] ? 'unread' : ''; ?>">
-                            <div class="notif-icon"><i data-lucide="<?php echo $icon; ?>"></i></div>
+                            <div class="notif-icon" style="<?php echo $n['type'] == 'chat' ? 'background: rgba(14, 165, 233, 0.1); color: #0ea5e9;' : ''; ?>"><i data-lucide="<?php echo $icon; ?>"></i></div>
                             <div class="notif-content">
                                 <div class="notif-msg">
+                                    <?php if($n['type'] == 'chat' && !empty($n['sender_name'])): ?>
+                                        <span style="color: var(--teal-primary);">[ข้อความจาก <?php echo htmlspecialchars($n['sender_name']); ?>]</span> 
+                                    <?php endif; ?>
                                     <?php echo htmlspecialchars($n['message']); ?>
                                 </div>
                                 <div class="notif-time">

@@ -20,7 +20,7 @@ if (!$doc) {
 }
 
 // Check if user is owner or admin
-if ($doc['user_id'] != $_SESSION['user_id'] && $_SESSION['role'] !== 'admin') {
+if ($doc['user_id'] !== $_SESSION['user_id'] && $_SESSION['role'] !== 'admin') {
     die("Access Denied: You do not have permission to edit this document.");
 }
 
@@ -277,7 +277,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <?php if ($error): ?>
                 <div style="background: hsl(0 84% 60% / 0.1); color: hsl(0 84% 60%); padding: 1rem; border-radius: 0.75rem; margin-bottom: 2rem; border: 1px solid hsl(0 84% 60% / 0.2); max-width: 900px; margin-left: auto; margin-right: auto;">
-                    <i data-lucide="alert-circle" style="width: 16px; vertical-align: middle; margin-right: 0.5rem;"></i><?php echo $error; ?>
+                    <i data-lucide="alert-circle" style="width: 16px; vertical-align: middle; margin-right: 0.5rem;"></i><?php echo htmlspecialchars($error); ?>
                 </div>
             <?php endif; ?>
 

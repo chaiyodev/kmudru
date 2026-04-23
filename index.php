@@ -37,27 +37,42 @@ if ($pdo) {
 
         // Fetch latest recommended docs (Content Spotlight - Mixed Types)
         $doc_query = "
-            (SELECT d.id, d.title, d.content, d.type, d.category_id, d.user_id, d.views, d.created_at, d.tags,
-                   c.name as category_name, c.icon as category_icon, 
-                   u.username as author_username, u.full_name as author_full_name, u.avatar as author_avatar,
-                   (SELECT COUNT(*) FROM document_likes WHERE document_id = d.id) as like_count,
-                   (SELECT COUNT(*) FROM comments WHERE document_id = d.id) as comment_count,
-                   'view.php?id=' as base_url
-            FROM documents d 
-            LEFT JOIN categories c ON d.category_id = c.id 
-            LEFT JOIN users u ON d.user_id = u.id 
-            WHERE d.status = 'published')
-            UNION ALL
-            (SELECT t.id, t.title, t.description as content, 'training' as type, t.category_id, NULL as user_id, 0 as views, t.created_at, '' as tags,
-                   c.name as category_name, 'graduation-cap' as category_icon,
-                   'System' as author_username, 'UDRU Training' as author_full_name, NULL as author_avatar,
-                   0 as like_count, 0 as comment_count,
-                   'training_view.php?id=' as base_url
-            FROM trainings t
-            LEFT JOIN categories c ON t.category_id = c.id)
+            SELECT * FROM (
+                (SELECT d.id, d.title, d.content, d.type, d.category_id, d.user_id, d.views, d.created_at, d.tags,
+                       c.name as category_name, c.icon as category_icon, 
+                       u.username as author_username, u.full_name as author_full_name, u.avatar as author_avatar,
+                       'view.php?id=' as base_url
+                FROM documents d 
+                LEFT JOIN categories c ON d.category_id = c.id 
+                LEFT JOIN users u ON d.user_id = u.id 
+                WHERE d.status = 'published')
+                UNION ALL
+                (SELECT t.id, t.title, t.description as content, 'training' as type, t.category_id, NULL as user_id, 0 as views, t.created_at, '' as tags,
+                       c.name as category_name, 'graduation-cap' as category_icon,
+                       'System' as author_username, 'UDRU Training' as author_full_name, NULL as author_avatar,
+                       'training_view.php?id=' as base_url
+                FROM trainings t
+                LEFT JOIN categories c ON t.category_id = c.id)
+            ) combined
             ORDER BY created_at DESC 
             LIMIT 6";
         $latest_docs = $pdo->query($doc_query)->fetchAll();
+
+        // Populate counts to avoid N+1 slow queries from correlated subqueries
+        foreach ($latest_docs as &$doc) {
+            $doc['like_count'] = 0;
+            $doc['comment_count'] = 0;
+            if ($doc['type'] !== 'training') {
+                $stmt = $pdo->prepare("SELECT COUNT(*) FROM document_likes WHERE document_id = ?");
+                $stmt->execute([$doc['id']]);
+                $doc['like_count'] = $stmt->fetchColumn();
+
+                $stmt = $pdo->prepare("SELECT COUNT(*) FROM comments WHERE document_id = ?");
+                $stmt->execute([$doc['id']]);
+                $doc['comment_count'] = $stmt->fetchColumn();
+            }
+        }
+        unset($doc); // Unset reference
 
         // Update type labels for display
         $type_labels = [
@@ -82,16 +97,16 @@ if ($pdo) {
             LIMIT 5";
         $recent_activity = $pdo->query($activity_query)->fetchAll();
 
-        // Fetch personalized AI insight (count of new docs in user's most viewed category)
+        // Fetch personalized AI insight (count of new docs in popular category)
         $ai_insight_count = 0;
         $ai_insight_category = 'ประกันคุณภาพ'; // Default
-        if ($user) {
-            // Find most frequent category in user's history or just most popular one
-            $stmt = $pdo->query("SELECT name FROM categories ORDER BY id ASC LIMIT 1");
-            $ai_insight_category = $stmt->fetchColumn() ?: 'ประกันคุณภาพ';
-
-            $stmt = $pdo->prepare("SELECT COUNT(*) FROM documents WHERE created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)");
-            $stmt->execute();
+        
+        if (!empty($trending_topics)) {
+            // Use the top trending category
+            $top_cat = $trending_topics[0];
+            $ai_insight_category = $top_cat['name'];
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM documents WHERE category_id = ? AND created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)");
+            $stmt->execute([$top_cat['id']]);
             $ai_insight_count = $stmt->fetchColumn();
         } else {
             $stmt = $pdo->query("SELECT COUNT(*) FROM documents WHERE created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)");
@@ -99,6 +114,7 @@ if ($pdo) {
         }
 
     } catch (PDOException $e) {
+        error_log("Index query Error: " . $e->getMessage());
     }
 }
 
@@ -294,7 +310,7 @@ require_once 'includes/head.php';
                                 <div class="card-footer">
                                     <div class="footer-author">
                                         <div class="author-sm-avatar" <?php if(!empty($doc['author_avatar']) && file_exists('uploads/avatars/' . $doc['author_avatar'])) echo 'style="background-image: url(\'uploads/avatars/' . htmlspecialchars($doc['author_avatar']) . '\'); background-size: cover; background-position: center; color: transparent; border: 1px solid var(--border-color);"'; ?>>
-                                            <?php if(empty($doc['author_avatar']) || !file_exists('uploads/avatars/' . $doc['author_avatar'])) echo mb_strtoupper(mb_substr($doc['author_username'] ?? 'U', 0, 1, 'UTF-8'), 'UTF-8'); ?>
+                                            <?php if(empty($doc['author_avatar']) || !file_exists('uploads/avatars/' . $doc['author_avatar'])) echo htmlspecialchars(mb_strtoupper(mb_substr($doc['author_username'] ?? 'U', 0, 1, 'UTF-8'), 'UTF-8')); ?>
                                         </div>
                                         <span
                                             class="author-sm-name"><?php echo e($doc['author_full_name'] ?? $doc['author_username'] ?? 'Anonymous'); ?></span>
@@ -332,7 +348,7 @@ require_once 'includes/head.php';
                         </h4>
                         <p style="font-size: 0.8rem; opacity: 0.9; line-height: 1.5;">
                             วันนี้มีเนื้อหาใหม่ <?php echo $ai_insight_count; ?> รายการในหัวข้อ
-                            "<?php echo $ai_insight_category; ?>" ที่คุณอาจสนใจครับ
+                            "<?php echo htmlspecialchars($ai_insight_category); ?>" ที่คุณอาจสนใจครับ
                         </p>
                         <a href="ai_assistant.php"
                             style="display: block; width: 100%; padding: 0.65rem; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 10px; color: white; text-align: center; text-decoration: none; margin-top: 1rem; font-size: 0.8125rem; font-weight: 700;">ดูข้อมูลเจาะลึก</a>

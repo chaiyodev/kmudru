@@ -1,6 +1,7 @@
 # Database configuration
 includes/db.php
 includes/config.php
+includes/google_config.php
 
 # PHP safe temp files
 *.tmp

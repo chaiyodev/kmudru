@@ -17,6 +17,10 @@ $users = $stmt_users->fetchAll();
 
 $messages = [];
 if ($target_user_id > 0) {
+    // Mark messages as read when opening the chat
+    $stmt_read = $pdo->prepare("UPDATE chat_messages SET is_read = 1 WHERE sender_id = ? AND receiver_id = ? AND is_read = 0");
+    $stmt_read->execute([$target_user_id, $user_id]);
+
     $stmt = $pdo->prepare("SELECT * FROM chat_messages WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?) ORDER BY created_at ASC");
     $stmt->execute([$user_id, $target_user_id, $target_user_id, $user_id]);
     $messages = $stmt->fetchAll();
@@ -27,6 +31,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $target_user_id > 0) {
     $message = $_POST['message'];
     $stmt = $pdo->prepare("INSERT INTO chat_messages (sender_id, receiver_id, message) VALUES (?, ?, ?)");
     $stmt->execute([$user_id, $target_user_id, $message]);
+    
+    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+        echo json_encode(['status' => 'success']);
+        exit();
+    }
+    
     header("Location: chat.php?user=$target_user_id");
     exit();
 }
@@ -103,6 +113,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $target_user_id > 0) {
         .chat-main {
             display: flex;
             flex-direction: column;
+            height: 100%;
+            min-height: 0;
+            overflow: hidden;
+            position: relative;
         }
 
         .chat-header {
@@ -117,10 +131,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $target_user_id > 0) {
             flex: 1;
             padding: 2rem;
             overflow-y: auto;
-            background: hsl(var(--muted) / 0.1);
+            background: hsl(var(--muted)/0.1);
             display: flex;
             flex-direction: column;
             gap: 1rem;
+            min-height: 0;
+            scroll-behavior: smooth;
         }
 
         .message-bubble {
@@ -147,10 +163,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $target_user_id > 0) {
         }
 
         .chat-input-area {
-            padding: 1.5rem 2rem;
+            padding: 1.25rem 2rem;
             border-top: 1px solid var(--border-color);
             display: flex;
             gap: 1rem;
+            background: white;
+            flex-shrink: 0;
+            z-index: 10;
         }
 
         .mobile-back-btn {
@@ -257,18 +276,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $target_user_id > 0) {
                                 </div>
                             </div>
                             <div style="display: flex; gap: 0.5rem;">
-                                <button class="btn-primary"
-                                    style="background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); padding: 0.5rem;"><i
-                                        data-lucide="phone" style="width: 18px; height: 18px;"></i></button>
-                                <button class="btn-primary"
-                                    style="background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); padding: 0.5rem;"><i
-                                        data-lucide="video" style="width: 18px; height: 18px;"></i></button>
+                                <!-- Phone/Video Calls are not yet functional, removed per user request -->
                             </div>
                         </div>
 
-                        <div class="message-area" id="message-container">
+                        <div class="message-area" id="message-container" data-last-id="<?php echo !empty($messages) ? end($messages)['id'] : 0; ?>">
                             <?php if (empty($messages)): ?>
-                                <div style="text-align: center; margin-top: 5rem; color: hsl(var(--muted-foreground));">
+                                <div id="no-messages-placeholder" style="text-align: center; margin-top: 5rem; color: hsl(var(--muted-foreground));">
                                     <i data-lucide="message-square" style="width: 48px; height: 48px; margin-bottom: 1rem;"></i>
                                     <p>ยังไม่มีข้อความ เริ่มต้นทักทายคุณ
                                         <?php echo e($target_user['full_name']); ?> ได้เลย!
@@ -277,7 +291,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $target_user_id > 0) {
                             <?php else: ?>
                                 <?php foreach ($messages as $m): ?>
                                     <div
-                                        class="message-bubble <?php echo $m['sender_id'] == $user_id ? 'message-sent' : 'message-received'; ?>">
+                                        class="message-bubble <?php echo $m['sender_id'] == $user_id ? 'message-sent' : 'message-received'; ?>" data-msg-id="<?php echo $m['id']; ?>">
                                         <?php echo e($m['message']); ?>
                                         <div style="font-size: 0.625rem; margin-top: 4px; opacity: 0.8; text-align: right;">
                                             <?php echo date('H:i', strtotime($m['created_at'])); ?>
@@ -287,13 +301,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $target_user_id > 0) {
                             <?php endif; ?>
                         </div>
 
-                        <form action="chat.php?user=<?php echo e($target_user_id); ?>" method="POST"
+                        <form id="chat-form" action="chat.php?user=<?php echo e($target_user_id); ?>" method="POST"
                             class="chat-input-area">
                             <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                             <button type="button" class="btn-primary"
                                 style="background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); padding: 1rem;"><i
                                     data-lucide="plus"></i></button>
-                            <input type="text" name="message" class="form-input" style="flex: 1;"
+                            <input type="text" id="chat-input" name="message" class="form-input" style="flex: 1;"
                                 placeholder="พิมพ์ข้อความของคุณที่นี่..." required autocomplete="off">
                             <button type="submit" class="btn-primary"><i data-lucide="send"></i></button>
                         </form>
@@ -318,6 +332,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $target_user_id > 0) {
         lucide.createIcons();
         const container = document.getElementById('message-container');
         if (container) container.scrollTop = container.scrollHeight;
+
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-input');
+        const targetUserId = <?php echo $target_user_id; ?>;
+
+        if (chatForm) {
+            chatForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const msg = chatInput.value.trim();
+                if (!msg) return;
+
+                const formData = new FormData(chatForm);
+                chatInput.value = '';
+
+                try {
+                    const response = await fetch(chatForm.action, {
+                        method: 'POST',
+                        body: formData,
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                    // After sending, poll immediately
+                    fetchNewMessages();
+                } catch (err) {
+                    console.error('Send error:', err);
+                }
+            });
+        }
+
+        async function fetchNewMessages() {
+            if (!container || !targetUserId) return;
+            const lastId = container.getAttribute('data-last-id');
+
+            try {
+                const res = await fetch(`api/chat_messages_fetch.php?target_id=${targetUserId}&last_id=${lastId}`);
+                const data = await res.json();
+
+                if (data.messages && data.messages.length > 0) {
+                    const placeholder = document.getElementById('no-messages-placeholder');
+                    if (placeholder) placeholder.remove();
+
+                    data.messages.forEach(m => {
+                        // Prevent duplicates
+                        if (document.querySelector(`[data-msg-id="${m.id}"]`)) return;
+
+                        const bubble = document.createElement('div');
+                        bubble.className = `message-bubble ${m.is_sent ? 'message-sent' : 'message-received'}`;
+                        bubble.setAttribute('data-msg-id', m.id);
+                        bubble.innerHTML = `${m.message}<div style="font-size: 0.625rem; margin-top: 4px; opacity: 0.8; text-align: right;">${m.time}</div>`;
+                        container.appendChild(bubble);
+                        container.setAttribute('data-last-id', m.id);
+                    });
+                    container.scrollTop = container.scrollHeight;
+                }
+            } catch (err) {
+                console.error('Fetch error:', err);
+            }
+        }
+
+        if (targetUserId > 0) {
+            setInterval(fetchNewMessages, 5000); // Poll every 5 seconds for stability
+        }
     </script>
 </body>
 

@@ -19,17 +19,26 @@ if ($pdo) {
         $stmt->execute([$user_id]);
         $user_info = $stmt->fetch();
 
-        $stmt = $pdo->prepare("SELECT d.*, c.name as category_name FROM documents d LEFT JOIN categories c ON d.category_id = c.id WHERE d.user_id = ? ORDER BY d.created_at DESC");
+        // Use SQL for stats instead of fetching all documents
+        $stmt = $pdo->prepare("SELECT COUNT(*) as total, COALESCE(SUM(views), 0) as total_views FROM documents WHERE user_id = ?");
         $stmt->execute([$user_id]);
-        $my_docs = $stmt->fetchAll();
+        $doc_stats = $stmt->fetch();
+        $stats['total'] = (int)$doc_stats['total'];
+        $stats['views'] = (int)$doc_stats['total_views'];
 
-        $stats['total'] = count($my_docs);
-        foreach ($my_docs as $doc) {
-            $stats['views'] += $doc['views'];
-        }
         $stmt = $pdo->prepare("SELECT COUNT(*) FROM document_likes dl JOIN documents d ON dl.document_id = d.id WHERE d.user_id = ?");
         $stmt->execute([$user_id]);
         $stats['likes'] = $stmt->fetchColumn();
+
+        // Paginated documents (10 per page)
+        $per_page = 10;
+        $current_page_num = max(1, (int)($_GET['page'] ?? 1));
+        $offset = ($current_page_num - 1) * $per_page;
+        $total_pages = max(1, ceil($stats['total'] / $per_page));
+
+        $stmt = $pdo->prepare("SELECT d.*, c.name as category_name FROM documents d LEFT JOIN categories c ON d.category_id = c.id WHERE d.user_id = ? ORDER BY d.created_at DESC LIMIT ? OFFSET ?");
+        $stmt->execute([$user_id, $per_page, $offset]);
+        $my_docs = $stmt->fetchAll();
 
         // Fetch Certificates
         $stmt = $pdo->prepare("SELECT c.*, t.title as course_title FROM certificates c JOIN trainings t ON c.course_id = t.id WHERE c.user_id = ? ORDER BY c.issued_at DESC");
@@ -43,27 +52,45 @@ if ($pdo) {
             $fileName = $_FILES['avatar']['name'];
             $fileNameCmps = explode(".", $fileName);
             $fileExtension = strtolower(end($fileNameCmps));
-            $newFileName = 'profile_' . uniqid() . '.' . $fileExtension;
-            $uploadFileDir = './uploads/avatars/';
 
-            if (!is_dir($uploadFileDir)) {
-                mkdir($uploadFileDir, 0777, true);
-            }
+            // Security: Validate extension and MIME type
+            $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+            $allowed_mime_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
-            $dest_path = $uploadFileDir . $newFileName;
-            if (move_uploaded_file($fileTmpPath, $dest_path)) {
-                $stmt = $pdo->prepare("UPDATE users SET avatar = ? WHERE id = ?");
-                $stmt->execute([$newFileName, $user_id]);
-                log_activity('avatar_upload', 'user', "New avatar: $newFileName");
-                $_SESSION['avatar'] = $newFileName;
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mime_type = finfo_file($finfo, $fileTmpPath);
+            finfo_close($finfo);
 
-                // Refresh $user_info
-                $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
-                $stmt->execute([$user_id]);
-                $user_info = $stmt->fetch();
+            $max_avatar_size = 5 * 1024 * 1024; // 5 MB
+
+            if (!in_array($fileExtension, $allowed_extensions) || !in_array($mime_type, $allowed_mime_types)) {
+                error_log("Avatar upload rejected: invalid type ($fileExtension / $mime_type) by user $user_id");
+            } elseif ($_FILES['avatar']['size'] > $max_avatar_size) {
+                error_log("Avatar upload rejected: file too large by user $user_id");
+            } else {
+                $newFileName = 'profile_' . uniqid() . '.' . $fileExtension;
+                $uploadFileDir = './uploads/avatars/';
+
+                if (!is_dir($uploadFileDir)) {
+                    mkdir($uploadFileDir, 0755, true);
+                }
+
+                $dest_path = $uploadFileDir . $newFileName;
+                if (move_uploaded_file($fileTmpPath, $dest_path)) {
+                    $stmt = $pdo->prepare("UPDATE users SET avatar = ? WHERE id = ?");
+                    $stmt->execute([$newFileName, $user_id]);
+                    log_activity('avatar_upload', 'user', "New avatar: $newFileName");
+                    $_SESSION['avatar'] = $newFileName;
+
+                    // Refresh $user_info
+                    $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+                    $stmt->execute([$user_id]);
+                    $user_info = $stmt->fetch();
+                }
             }
         }
     } catch (PDOException $e) {
+        error_log("Profile page error: " . $e->getMessage());
     }
 }
 
@@ -109,6 +136,66 @@ $extra_css = <<<'HTML'
             text-align: left;
             margin: 2rem 0;
         }
+
+        /* Responsive Layouts and Premium Touches */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2.5rem;
+        }
+
+        .profile-stat-card {
+            background: white;
+            border-radius: 1.25rem;
+            border: 1px solid var(--border-color);
+            padding: 1.5rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        .profile-stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            border-color: var(--teal-primary);
+        }
+
+        .profile-main-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 2.5rem;
+        }
+
+        .certificates-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+
+        @media (max-width: 1024px) {
+            .profile-main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+                margin-bottom: 2rem;
+            }
+            .profile-card {
+                padding: 2rem 1.5rem;
+            }
+            .avatar-edit-container {
+                width: 100px;
+                height: 100px;
+            }
+            .avatar-preview-wrapper {
+                font-size: 2.5rem;
+                border-radius: 28px;
+            }
+        }
     </style>
 HTML;
 require_once 'includes/head.php';
@@ -128,9 +215,8 @@ require_once 'includes/head.php';
             </header>
 
             <!-- Stats Grid -->
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 2.5rem;">
-                <div
-                    style="background: white; border-radius: 1rem; border: 1px solid var(--border-color); padding: 1.5rem;">
+            <div class="stats-grid">
+                <div class="profile-stat-card">
                     <div
                         style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <span
@@ -139,8 +225,7 @@ require_once 'includes/head.php';
                     </div>
                     <div style="font-size: 2rem; font-weight: 800;"><?php echo $stats['total']; ?></div>
                 </div>
-                <div
-                    style="background: white; border-radius: 1rem; border: 1px solid var(--border-color); padding: 1.5rem;">
+                <div class="profile-stat-card">
                     <div
                         style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <span
@@ -149,8 +234,7 @@ require_once 'includes/head.php';
                     </div>
                     <div style="font-size: 2rem; font-weight: 800;"><?php echo $stats['views']; ?></div>
                 </div>
-                <div
-                    style="background: white; border-radius: 1rem; border: 1px solid var(--border-color); padding: 1.5rem;">
+                <div class="profile-stat-card">
                     <div
                         style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <span
@@ -161,7 +245,7 @@ require_once 'includes/head.php';
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem;">
+            <div class="profile-main-grid">
                 <!-- Profile Sidebar -->
                 <div class="profile-card">
                     <form action="profile.php" method="POST" enctype="multipart/form-data" id="avatar-form">
@@ -281,6 +365,29 @@ require_once 'includes/head.php';
                                 </div>
                             <?php endforeach; ?>
                         </div>
+
+                        <?php if ($total_pages > 1): ?>
+                        <!-- Pagination -->
+                        <div style="display: flex; justify-content: center; align-items: center; gap: 0.5rem; margin-top: 1.5rem;">
+                            <?php if ($current_page_num > 1): ?>
+                                <a href="?page=<?php echo $current_page_num - 1; ?>" style="padding: 0.5rem 1rem; border: 1px solid var(--border-color); border-radius: 0.5rem; text-decoration: none; color: hsl(var(--foreground)); font-size: 0.875rem; font-weight: 600;">← ก่อนหน้า</a>
+                            <?php endif; ?>
+
+                            <?php for ($p = 1; $p <= $total_pages; $p++): ?>
+                                <?php if ($p == $current_page_num): ?>
+                                    <span style="padding: 0.5rem 0.875rem; background: var(--teal-primary); color: white; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 700;"><?php echo $p; ?></span>
+                                <?php elseif ($p <= 2 || $p >= $total_pages - 1 || abs($p - $current_page_num) <= 1): ?>
+                                    <a href="?page=<?php echo $p; ?>" style="padding: 0.5rem 0.875rem; border: 1px solid var(--border-color); border-radius: 0.5rem; text-decoration: none; color: hsl(var(--foreground)); font-size: 0.875rem;"><?php echo $p; ?></a>
+                                <?php elseif ($p == 3 || $p == $total_pages - 2): ?>
+                                    <span style="color: hsl(var(--muted-foreground));">...</span>
+                                <?php endif; ?>
+                            <?php endfor; ?>
+
+                            <?php if ($current_page_num < $total_pages): ?>
+                                <a href="?page=<?php echo $current_page_num + 1; ?>" style="padding: 0.5rem 1rem; border: 1px solid var(--border-color); border-radius: 0.5rem; text-decoration: none; color: hsl(var(--foreground)); font-size: 0.875rem; font-weight: 600;">ถัดไป →</a>
+                            <?php endif; ?>
+                        </div>
+                        <?php endif; ?>
                     <?php endif; ?>
 
                     <!-- Certificates Section -->
@@ -295,7 +402,7 @@ require_once 'includes/head.php';
                             คุณยังไม่มีใบประกาศนียบัตร เรียนหลักสูตรและสอบให้ผ่านเพื่อรับใบประกาศ!
                         </div>
                     <?php else: ?>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="certificates-grid">
                             <?php foreach ($certificates as $cert): ?>
                                 <div
                                     style="background: white; border-radius: 1rem; border: 1px solid var(--border-color); padding: 1.5rem; display: flex; align-items: center; gap: 1rem;">

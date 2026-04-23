@@ -7,34 +7,62 @@ require_admin();
 
 $pdo = get_pdo();
 
-// Admin Stats
-$total_users = $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
-$total_docs = $pdo->query("SELECT COUNT(*) FROM documents")->fetchColumn();
-$total_comments = $pdo->query("SELECT COUNT(*) FROM comments")->fetchColumn();
-$total_communities = $pdo->query("SELECT COUNT(*) FROM communities")->fetchColumn();
-$total_trainings = $pdo->query("SELECT COUNT(*) FROM trainings")->fetchColumn();
+// Initialize defaults
+$total_users = 0; $total_docs = 0; $total_comments = 0; $total_communities = 0;
+$total_trainings = 0; $total_ai_searches = 0; $docs_this_week = 0; $users_this_week = 0;
+$top_searches = []; $total_visits = 0; $internal_visits = 0; $external_visits = 0;
+$visits_today = 0; $visits_this_week = 0; $top_pages = []; $recent_users = [];
 
-// AI Search stats (with details column now available)
-$total_ai_searches = $pdo->query("SELECT COUNT(*) FROM activity_logs WHERE action = 'ai_search'")->fetchColumn();
+try {
+    // Combined stats query: 1 query instead of 4 separate COUNT queries
+    $combined = $pdo->query("
+        SELECT 
+            (SELECT COUNT(*) FROM users) as total_users,
+            (SELECT COUNT(*) FROM documents) as total_docs,
+            (SELECT COUNT(*) FROM comments) as total_comments,
+            (SELECT COUNT(*) FROM trainings) as total_trainings,
+            (SELECT COUNT(*) FROM documents WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as docs_this_week,
+            (SELECT COUNT(*) FROM users WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as users_this_week
+    ")->fetch();
+    $total_users = (int)$combined['total_users'];
+    $total_docs = (int)$combined['total_docs'];
+    $total_comments = (int)$combined['total_comments'];
+    $total_trainings = (int)$combined['total_trainings'];
+    $docs_this_week = (int)$combined['docs_this_week'];
+    $users_this_week = (int)$combined['users_this_week'];
 
-// Content this week
-$docs_this_week = $pdo->query("SELECT COUNT(*) FROM documents WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)")->fetchColumn();
-$users_this_week = $pdo->query("SELECT COUNT(*) FROM users WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)")->fetchColumn();
+    $recent_users = $pdo->query("SELECT * FROM users ORDER BY created_at DESC LIMIT 5")->fetchAll();
+} catch (PDOException $e) {
+    error_log("Admin dashboard core stats error: " . $e->getMessage());
+}
 
-// Top searched terms
-$top_searches = $pdo->query("SELECT details, COUNT(*) as cnt FROM activity_logs WHERE action = 'ai_search' AND details IS NOT NULL GROUP BY details ORDER BY cnt DESC LIMIT 5")->fetchAll();
+try {
+    $total_communities = $pdo->query("SELECT COUNT(*) FROM communities")->fetchColumn();
+} catch (PDOException $e) { /* communities table may not exist */ }
 
-// Visitor Statistics
-$total_visits = $pdo->query("SELECT COUNT(*) FROM visitor_stats")->fetchColumn();
-$internal_visits = $pdo->query("SELECT COUNT(*) FROM visitor_stats WHERE is_internal = 1")->fetchColumn();
-$external_visits = $pdo->query("SELECT COUNT(*) FROM visitor_stats WHERE is_internal = 0")->fetchColumn();
-$visits_today = $pdo->query("SELECT COUNT(*) FROM visitor_stats WHERE visit_date = CURDATE()")->fetchColumn();
-$visits_this_week = $pdo->query("SELECT COUNT(*) FROM visitor_stats WHERE visit_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)")->fetchColumn();
+try {
+    $total_ai_searches = $pdo->query("SELECT COUNT(*) FROM activity_logs WHERE action = 'ai_search'")->fetchColumn();
+    $top_searches = $pdo->query("SELECT details, COUNT(*) as cnt FROM activity_logs WHERE action = 'ai_search' AND details IS NOT NULL GROUP BY details ORDER BY cnt DESC LIMIT 5")->fetchAll();
+} catch (PDOException $e) { /* activity_logs table may not exist */ }
 
-// Most visited pages
-$top_pages = $pdo->query("SELECT page_visited, COUNT(*) as cnt FROM visitor_stats GROUP BY page_visited ORDER BY cnt DESC LIMIT 5")->fetchAll();
-
-$recent_users = $pdo->query("SELECT * FROM users ORDER BY created_at DESC LIMIT 5")->fetchAll();
+try {
+    // Combined visitor stats: 1 query instead of 5 separate COUNT queries
+    $visitor_stats = $pdo->query("
+        SELECT 
+            COUNT(*) as total_visits,
+            SUM(CASE WHEN is_internal = 1 THEN 1 ELSE 0 END) as internal_visits,
+            SUM(CASE WHEN is_internal = 0 THEN 1 ELSE 0 END) as external_visits,
+            SUM(CASE WHEN visit_date = CURDATE() THEN 1 ELSE 0 END) as visits_today,
+            SUM(CASE WHEN visit_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) THEN 1 ELSE 0 END) as visits_this_week
+        FROM visitor_stats
+    ")->fetch();
+    $total_visits = (int)$visitor_stats['total_visits'];
+    $internal_visits = (int)$visitor_stats['internal_visits'];
+    $external_visits = (int)$visitor_stats['external_visits'];
+    $visits_today = (int)$visitor_stats['visits_today'];
+    $visits_this_week = (int)$visitor_stats['visits_this_week'];
+    $top_pages = $pdo->query("SELECT page_visited, COUNT(*) as cnt FROM visitor_stats GROUP BY page_visited ORDER BY cnt DESC LIMIT 5")->fetchAll();
+} catch (PDOException $e) { /* visitor_stats table may not exist */ }
 ?>
 <?php
 $page_title = 'ผู้ดูแลระบบ | UDRU Wisdom';

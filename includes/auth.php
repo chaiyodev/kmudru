@@ -25,18 +25,43 @@ require_once __DIR__ . '/logger.php';
 
 function login($username, $password)
 {
-    // Basic Brute Force Protection
-    if (isset($_SESSION['login_attempts']) && $_SESSION['login_attempts'] > 5) {
-        if (time() - $_SESSION['last_attempt_time'] < 300) { // 5 mins lockout
-            return "Too many attempts. Please wait.";
-        } else {
-            $_SESSION['login_attempts'] = 0;
-        }
-    }
-
     $pdo = get_pdo();
     if (!$pdo)
         return false;
+
+    // Ensure login_attempts table exists
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS login_attempts (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            ip_address VARCHAR(45) NOT NULL,
+            attempted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_ip_time (ip_address, attempted_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (PDOException $e) {
+        error_log("login_attempts table creation error: " . $e->getMessage());
+    }
+
+    // IP-based Brute Force Protection
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    $lockout_minutes = 5;
+    $max_attempts = 5;
+
+    try {
+        // Clean old attempts (older than lockout period)
+        $pdo->prepare("DELETE FROM login_attempts WHERE attempted_at < DATE_SUB(NOW(), INTERVAL ? MINUTE)")->execute([$lockout_minutes]);
+
+        // Count recent attempts from this IP
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM login_attempts WHERE ip_address = ? AND attempted_at > DATE_SUB(NOW(), INTERVAL ? MINUTE)");
+        $stmt->execute([$ip, $lockout_minutes]);
+        $attempts = $stmt->fetchColumn();
+
+        if ($attempts >= $max_attempts) {
+            return "พยายามเข้าสู่ระบบหลายครั้งเกินไป กรุณารอ {$lockout_minutes} นาทีแล้วลองใหม่ครับ";
+        }
+    } catch (PDOException $e) {
+        error_log("Brute force check error: " . $e->getMessage());
+        // Fallback: allow login attempt if table check fails
+    }
 
     $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ?");
     $stmt->execute([$username]);
@@ -47,13 +72,23 @@ function login($username, $password)
         $_SESSION['username'] = $user['username'];
         $_SESSION['full_name'] = $user['full_name'];
         $_SESSION['role'] = $user['role'];
-        unset($_SESSION['login_attempts']);
+
+        // Clear attempts on successful login
+        try {
+            $pdo->prepare("DELETE FROM login_attempts WHERE ip_address = ?")->execute([$ip]);
+        } catch (PDOException $e) {}
+
         log_activity('login');
         return true;
     }
 
-    $_SESSION['login_attempts'] = ($_SESSION['login_attempts'] ?? 0) + 1;
-    $_SESSION['last_attempt_time'] = time();
+    // Record failed attempt
+    try {
+        $pdo->prepare("INSERT INTO login_attempts (ip_address) VALUES (?)")->execute([$ip]);
+    } catch (PDOException $e) {
+        error_log("Failed to record login attempt: " . $e->getMessage());
+    }
+
     return false;
 }
 

@@ -7,8 +7,20 @@ require_once __DIR__ . '/notifications.php';
 
 $sidebar_pdo = get_pdo();
 
-// Consolidate counts to run only 1 query instead of many
-$type_counts = $sidebar_pdo->query("SELECT type, COUNT(*) as count FROM documents GROUP BY type")->fetchAll(PDO::FETCH_KEY_PAIR);
+// Cache document type counts in session (refresh every 5 minutes)
+$cache_key = 'sidebar_type_counts';
+$cache_ttl = 300; // 5 minutes
+if (!isset($_SESSION[$cache_key]) || !isset($_SESSION[$cache_key . '_time']) || (time() - $_SESSION[$cache_key . '_time']) > $cache_ttl) {
+    try {
+        $type_counts = $sidebar_pdo->query("SELECT type, COUNT(*) as count FROM documents GROUP BY type")->fetchAll(PDO::FETCH_KEY_PAIR);
+        $_SESSION[$cache_key] = $type_counts;
+        $_SESSION[$cache_key . '_time'] = time();
+    } catch (PDOException $e) {
+        $type_counts = $_SESSION[$cache_key] ?? [];
+    }
+} else {
+    $type_counts = $_SESSION[$cache_key];
+}
 $total_docs = array_sum($type_counts);
 $current_page = basename($_SERVER['PHP_SELF']);
 $type = $_GET['type'] ?? '';
@@ -146,7 +158,10 @@ if (is_logged_in()) {
                 </div>
                 <div class="profile-actions">
                     <a href="profile.php" class="btn-sm">โปรไฟล์</a>
-                    <a href="logout.php" class="btn-sm logout">ออกระบบ</a>
+                    <form action="logout.php" method="POST" style="display: inline; margin: 0;">
+                        <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
+                        <button type="submit" class="btn-sm logout" style="border: none; cursor: pointer; font-family: inherit;">ออกระบบ</button>
+                    </form>
                 </div>
             </div>
         <?php else: ?>
@@ -172,7 +187,7 @@ if (is_logged_in()) {
                 <div style="display: flex; align-items: center; gap: 12px; opacity: 1;">
                     <i data-lucide="shield-check" class="system-credit-icon" style="color: var(--teal-primary);"></i>
                     <span
-                        style="font-size: 0.85rem; color: var(--teal-primary); font-weight: 800;">prapakorn1.1.0</span>
+                        style="font-size: 0.85rem; color: var(--teal-primary); font-weight: 800;"><?php echo APP_VERSION; ?></span>
                 </div>
             </div>
         </div>
@@ -407,13 +422,112 @@ if (is_logged_in()) {
         sidebar.classList.toggle('mobile-open');
     }
 
-    function toggleNotifications(event) {
+    async function fetchNotifications() {
+        try {
+            const res = await fetch('api/notifications_fetch.php');
+            const data = await res.json();
+            if (data.error) return;
+
+            // 1. Update bell badge
+            const bellBtn = document.querySelector('.notification-bell-btn');
+            if (bellBtn) {
+                let badge = bellBtn.querySelector('.bell-badge');
+                if (data.unread_count > 0) {
+                    if (!badge) {
+                        badge = document.createElement('span');
+                        badge.className = 'bell-badge';
+                        bellBtn.appendChild(badge);
+                    }
+                    badge.textContent = data.unread_count;
+                } else if (badge) {
+                    badge.remove();
+                }
+            }
+
+            // 2. Update dropdown header badge
+            const headerBadge = document.querySelector('.notif-header span');
+            if (headerBadge) {
+                if (data.unread_count > 0) {
+                    headerBadge.style.display = 'inline-block';
+                    headerBadge.textContent = 'ใหม่ ' + data.unread_count;
+                } else {
+                    headerBadge.style.display = 'none';
+                }
+            } else if (data.unread_count > 0) {
+                const header = document.querySelector('.notif-header');
+                if (header) {
+                    const span = document.createElement('span');
+                    span.style = "font-size: 0.7rem; background: rgba(20, 184, 166, 0.1); color: var(--teal-primary); padding: 2px 8px; border-radius: 100px; font-weight: 700;";
+                    span.textContent = 'ใหม่ ' + data.unread_count;
+                    header.appendChild(span);
+                }
+            }
+
+            // 3. Update dropdown body
+            const body = document.querySelector('.notif-body');
+            if (body && data.previews) {
+                if (data.previews.length === 0) {
+                    body.innerHTML = `
+                        <div class="notif-empty">
+                            <i data-lucide="bell-off" style="width: 40px; height: 40px; margin-bottom: 0.75rem; opacity: 0.5;"></i>
+                            <p style="font-size: 0.8125rem;">ไม่มีการแจ้งเตือนใหม่</p>
+                        </div>
+                    `;
+                } else {
+                    let itemsHtml = '';
+                    data.previews.forEach(n => {
+                        const bgStyle = (n.source === 'chat') ? 'style="background: rgba(20, 184, 166, 0.03);"' : '';
+                        const iconBg = (n.source === 'chat') ? 'style="background: rgba(14, 165, 233, 0.1); color: #0ea5e9;"' : '';
+                        const iconType = (n.source === 'chat') ? 'message-square' : 'bell';
+                        const senderStr = (n.source === 'chat') ? `<strong>${n.sender_name}:</strong> ` : '';
+                        
+                        itemsHtml += `
+                            <a href="${n.link}" class="notif-item" ${bgStyle}>
+                                <div class="notif-icon" ${iconBg}><i data-lucide="${iconType}" style="width: 16px;"></i></div>
+                                <div class="notif-content">
+                                    <div class="notif-text">${senderStr}${n.message}</div>
+                                    <div class="notif-time">${n.display_time}</div>
+                                </div>
+                            </a>
+                        `;
+                    });
+                    body.innerHTML = itemsHtml;
+                }
+                lucide.createIcons();
+            }
+        } catch (err) {
+            console.error('Notif fetch error:', err);
+        }
+    }
+
+    // Auto-poll every 30 seconds (reduced from 10s for performance)
+    setInterval(fetchNotifications, 30000);
+
+    async function toggleNotifications(event) {
         if (event) event.stopPropagation();
         const dropdown = document.getElementById('notif-dropdown');
-        if (dropdown) dropdown.classList.toggle('show');
+        if (!dropdown) return;
+        
+        const isOpening = !dropdown.classList.contains('show');
+        dropdown.classList.toggle('show');
+
+        // If opening, mark as read
+        if (isOpening) {
+            try {
+                const res = await fetch('api/notifications_mark_read.php');
+                const data = await res.json();
+                if (data.status === 'success') {
+                    // Remove badge immediately
+                    const badge = document.querySelector('.notification-bell-btn .bell-badge');
+                    if (badge) badge.remove();
+                    const hBadge = document.querySelector('.notif-header span');
+                    if (hBadge) hBadge.style.display = 'none';
+                }
+            } catch (err) { console.error(err); }
+        }
 
         // Close dropdown when clicking outside
-        if (dropdown && dropdown.classList.contains('show')) {
+        if (dropdown.classList.contains('show')) {
             const closeHandler = (e) => {
                 if (!dropdown.contains(e.target) && !e.target.closest('.notification-bell-btn')) {
                     dropdown.classList.remove('show');
@@ -510,9 +624,23 @@ function render_notification_component($unread_count = 0)
     global $sidebar_pdo;
     $previews = [];
     if (is_logged_in()) {
-        $stmt = $sidebar_pdo->prepare("SELECT message, created_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 3");
-        $stmt->execute([$_SESSION['user_id']]);
-        $previews = $stmt->fetchAll();
+        $uid = $_SESSION['user_id'];
+        // Fetch system notifications
+        $stmt = $sidebar_pdo->prepare("SELECT message, created_at, 'notif' as source FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 5");
+        $stmt->execute([$uid]);
+        $sys_notifs = $stmt->fetchAll();
+
+        // Fetch unread chat messages
+        $stmt_chat = $sidebar_pdo->prepare("SELECT m.message, m.created_at, 'chat' as source, u.full_name as sender_name FROM chat_messages m JOIN users u ON m.sender_id = u.id WHERE m.receiver_id = ? AND m.is_read = 0 ORDER BY m.created_at DESC LIMIT 5");
+        $stmt_chat->execute([$uid]);
+        $chat_notifs = $stmt_chat->fetchAll();
+
+        $previews = array_merge($sys_notifs, $chat_notifs);
+        // Sort combined list by created_at DESC
+        usort($previews, function($a, $b) {
+            return strtotime($b['created_at']) - strtotime($a['created_at']);
+        });
+        $previews = array_slice($previews, 0, 5);
     }
     ?>
     <div class="notification-bell-container">
@@ -540,10 +668,17 @@ function render_notification_component($unread_count = 0)
                     </div>
                 <?php else: ?>
                     <?php foreach ($previews as $n): ?>
-                        <a href="notifications.php" class="notif-item">
-                            <div class="notif-icon"><i data-lucide="message-circle" style="width: 16px;"></i></div>
+                        <a href="<?php echo $n['source'] == 'chat' ? 'chat.php' : 'notifications.php'; ?>" class="notif-item" <?php if($n['source'] == 'chat') echo 'style="background: rgba(20, 184, 166, 0.03);"'; ?>>
+                            <div class="notif-icon" style="<?php echo $n['source'] == 'chat' ? 'background: rgba(14, 165, 233, 0.1); color: #0ea5e9;' : ''; ?>">
+                                <i data-lucide="<?php echo $n['source'] == 'chat' ? 'message-square' : 'bell'; ?>" style="width: 16px;"></i>
+                            </div>
                             <div class="notif-content">
-                                <div class="notif-text"><?php echo htmlspecialchars($n['message']); ?></div>
+                                <div class="notif-text">
+                                    <?php if($n['source'] == 'chat'): ?>
+                                        <strong><?php echo htmlspecialchars($n['sender_name']); ?>:</strong>
+                                    <?php endif; ?>
+                                    <?php echo htmlspecialchars($n['message']); ?>
+                                </div>
                                 <div class="notif-time"><?php echo date('d M H:i', strtotime($n['created_at'])); ?></div>
                             </div>
                         </a>

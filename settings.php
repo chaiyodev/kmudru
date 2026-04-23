@@ -17,17 +17,73 @@ $user_data = $stmt->fetch();
 $message = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf_token($_POST['csrf_token'] ?? '');
-    $full_name = $_POST['full_name'];
-    $email = $_POST['email'];
-    $dept = $_POST['department'];
+    $full_name = trim($_POST['full_name'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $dept = trim($_POST['department'] ?? '');
 
-    try {
-        $stmt = $pdo->prepare("UPDATE users SET full_name = ?, email = ?, department = ? WHERE id = ?");
-        $stmt->execute([$full_name, $email, $dept, $user_id]);
-        $message = "บันทึกการตั้งค่าเรียบร้อยแล้ว!";
-    } catch (PDOException $e) {
-        $message = "Error: " . $e->getMessage();
+    if (empty($full_name) || empty($email)) {
+        $message = "กรุณากรอกชื่อ-นามสกุลและอีเมล";
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $message = "รูปแบบอีเมลไม่ถูกต้อง";
+    } else {
+        try {
+            $stmt = $pdo->prepare("UPDATE users SET full_name = ?, email = ?, department = ? WHERE id = ?");
+            $stmt->execute([$full_name, $email, $dept, $user_id]);
+            $message = "บันทึกการตั้งค่าเรียบร้อยแล้ว!";
+        } catch (PDOException $e) {
+            error_log("Settings update error: " . $e->getMessage());
+            $message = "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง";
+        }
     }
+}
+
+// Ensure user_preferences table exists
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS user_preferences (
+        user_id INT PRIMARY KEY,
+        email_notifications TINYINT(1) DEFAULT 1,
+        system_alerts TINYINT(1) DEFAULT 1,
+        two_factor_auth TINYINT(1) DEFAULT 0,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+} catch (PDOException $e) {
+    error_log("user_preferences table error: " . $e->getMessage());
+}
+
+// Handle AJAX preference save
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_pref'])) {
+    header('Content-Type: application/json');
+    $pref_key = $_POST['pref_key'] ?? '';
+    $pref_val = (int)($_POST['pref_val'] ?? 0);
+    $allowed_keys = ['email_notifications', 'system_alerts', 'two_factor_auth'];
+    if (in_array($pref_key, $allowed_keys)) {
+        try {
+            $stmt = $pdo->prepare("INSERT INTO user_preferences (user_id, $pref_key) VALUES (?, ?) ON DUPLICATE KEY UPDATE $pref_key = ?");
+            $stmt->execute([$user_id, $pref_val, $pref_val]);
+            echo json_encode(['status' => 'success']);
+        } catch (PDOException $e) {
+            error_log("Pref save error: " . $e->getMessage());
+            echo json_encode(['status' => 'error']);
+        }
+    } else {
+        echo json_encode(['status' => 'invalid_key']);
+    }
+    exit;
+}
+
+// Load saved preferences
+$user_prefs = ['email_notifications' => 1, 'system_alerts' => 1, 'two_factor_auth' => 0];
+try {
+    $stmt = $pdo->prepare("SELECT * FROM user_preferences WHERE user_id = ?");
+    $stmt->execute([$user_id]);
+    $saved_prefs = $stmt->fetch();
+    if ($saved_prefs) {
+        $user_prefs['email_notifications'] = (int)$saved_prefs['email_notifications'];
+        $user_prefs['system_alerts'] = (int)$saved_prefs['system_alerts'];
+        $user_prefs['two_factor_auth'] = (int)$saved_prefs['two_factor_auth'];
+    }
+} catch (PDOException $e) {
+    error_log("Pref load error: " . $e->getMessage());
 }
 ?>
 <!DOCTYPE html>
@@ -270,7 +326,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         style="margin-top: auto; padding: 1rem; background: hsl(var(--primary)/0.05); border-radius: 0.75rem; font-size: 0.75rem; color: var(--teal-primary);">
                         <i data-lucide="info"
                             style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i>
-                        เวอร์ชันระบบ 1.1.0 (PRO)
+                        <?php echo APP_VERSION; ?>
                     </div>
                 </aside>
 
@@ -310,16 +366,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <h4>อีเมลแจ้งเตือน (Email Notifications)</h4>
                                 <p>รับอีเมลเมื่อมีบทความใหม่หรือคำถามที่ตรงกับความเชี่ยวชาญ</p>
                             </div>
-                            <label class="switch"><input type="checkbox" checked
-                                    onchange="notifyChange('Email Notifications')"><span class="slider"></span></label>
+                            <label class="switch"><input type="checkbox" <?php echo $user_prefs['email_notifications'] ? 'checked' : ''; ?>
+                                    onchange="savePref('email_notifications', this.checked, 'Email Notifications')"><span class="slider"></span></label>
                         </div>
                         <div class="toggle-group">
                             <div class="toggle-info">
                                 <h4>การแจ้งเตือนในระบบ (System Alerts)</h4>
                                 <p>แสดงจุดแจ้งเตือนเมื่อมีคนมาคอมเมนต์หรือกดไลก์</p>
                             </div>
-                            <label class="switch"><input type="checkbox" checked
-                                    onchange="notifyChange('System Alerts')"><span class="slider"></span></label>
+                            <label class="switch"><input type="checkbox" <?php echo $user_prefs['system_alerts'] ? 'checked' : ''; ?>
+                                    onchange="savePref('system_alerts', this.checked, 'System Alerts')"><span class="slider"></span></label>
                         </div>
                     </section>
 
@@ -331,8 +387,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <h4>การยืนยันตัวตนสองชั้น (2FA)</h4>
                                 <p>เพิ่มความปลอดภัยพิเศษให้กับบัญชีของคุณ</p>
                             </div>
-                            <label class="switch"><input type="checkbox"
-                                    onchange="notifyChange('2FA Authenticator')"><span class="slider"></span></label>
+                            <label class="switch"><input type="checkbox" <?php echo $user_prefs['two_factor_auth'] ? 'checked' : ''; ?>
+                                    onchange="savePref('two_factor_auth', this.checked, '2FA Authenticator')"><span class="slider"></span></label>
                         </div>
                         <button class="btn-primary"
                             style="margin-top: 2rem; background: #64748b;">เปลี่ยนรหัสผ่านใหม่</button>
@@ -402,6 +458,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 showConfirmButton: false,
                 timer: 2000
             });
+        }
+
+        async function savePref(key, value, label) {
+            try {
+                const formData = new FormData();
+                formData.append('ajax_pref', '1');
+                formData.append('pref_key', key);
+                formData.append('pref_val', value ? 1 : 0);
+                const res = await fetch('settings.php', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    notifyChange(label);
+                }
+            } catch (err) {
+                console.error('Pref save error:', err);
+            }
         }
 
         function setTheme(hsl, el) {

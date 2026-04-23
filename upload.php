@@ -148,7 +148,7 @@ require_once 'includes/head.php';
                         <div class="upload-icon"><i data-lucide="upload-cloud"></i></div>
                         <h3 style="font-weight: 700; margin-bottom: 0.5rem;">คลิกเพื่อเลือกไฟล์ หรือลากมาวางที่นี่</h3>
                         <p style="font-size: 0.8125rem; color: hsl(var(--muted-foreground));">รองรับไฟล์ PDF, Word,
-                            Excel, PPT และไฟล์รูปภาพ (สูงสุด 20MB)</p>
+                            Excel, PPT และไฟล์รูปภาพ (สูงสุด 50MB)</p>
                         <input type="file" name="file" id="file-input" style="display: none;">
                     </div>
 
